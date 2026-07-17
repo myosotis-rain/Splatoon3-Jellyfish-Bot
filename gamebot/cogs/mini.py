@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from .. import config, game_logic, messages, mini_flow
+from ..views import IdentityRevealView
 
 
 class MiniCog(commands.Cog):
@@ -51,7 +52,7 @@ class MiniCog(commands.Cog):
             await ctx.send(str(e), ephemeral=True)
             return
         self.db.leave_mini_session(session["id"], ctx.author.id)
-        await ctx.send(f"👋 {ctx.author.display_name} 已离开 Mini 名单")
+        await ctx.send(f"🌊 {ctx.author.display_name} 已离开 Mini 名单")
 
     @mini.command(name="kick", description="[管理] 将某玩家移出 Mini 名单")
     @app_commands.describe(member="要移出的玩家")
@@ -61,7 +62,7 @@ class MiniCog(commands.Cog):
             await ctx.send("当前没有进行中的 Mini 名单。", ephemeral=True)
             return
         self.db.leave_mini_session(session["id"], member.id)
-        await ctx.send(f"👋 已将 {messages.mention(member.id)} 移出 Mini 名单")
+        await ctx.send(f"🌊 已将 {messages.mention(member.id)} 移出 Mini 名单")
 
     @mini.command(name="status", description="查看 Mini 名单")
     async def status(self, ctx: commands.Context):
@@ -126,26 +127,13 @@ class MiniCog(commands.Cog):
         game_id, game_number = self.db.create_mini_game(session["id"])
         self.db.save_mini_team_assignment(game_id, teams, identities)
 
-        await ctx.send(messages.team_announcement_text(game_number, teams, label="Mini"))
-
-        dm_failures = []
-        for team, player_ids in teams.items():
-            for player_id in player_ids:
-                identity = identities[player_id]
-                member = ctx.guild.get_member(int(player_id))
-                if member is None:
-                    dm_failures.append(player_id)
-                    continue
-                try:
-                    await member.send(messages.mini_identity_card_text(team, identity))
-                except discord.Forbidden:
-                    dm_failures.append(player_id)
-
-        if dm_failures:
-            mentions = ", ".join(messages.mention(p) for p in dm_failures)
-            await ctx.send(
-                f"⚠️ 以下玩家私信发送失败，请确认已开启「允许来自服务器成员的私信」: {mentions}"
-            )
+        view = IdentityRevealView(
+            self.db, game_id, teams, identities,
+            track_confirmation=False, card_text_fn=messages.mini_identity_card_text,
+        )
+        await ctx.send(
+            messages.team_announcement_text(game_number, teams, label="Mini"), view=view
+        )
 
     @mini.command(name="result", description="记录输方队伍并开始投票")
     @app_commands.describe(losing_team="输方队伍，A 或 B")
