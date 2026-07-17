@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from .. import config, game_logic, messages, mini_flow
-from ..views import IdentityRevealView
+from ..views import IdentityRevealView, VotingView
 
 
 class MiniCog(commands.Cog):
@@ -156,9 +156,19 @@ class MiniCog(commands.Cog):
 
         winning = [t for t in config.TEAMS if t != losing][0]
         self.db.set_mini_game_result(game["id"], losing, winning)
-        await ctx.send(
-            f"输方: {losing}\n胜方: {winning}\n\n可以开始讨论，讨论结束后使用 /vote 进行第一轮投票。"
+        teams, identities = self.db.get_mini_teams_and_identities(game["id"])
+        refreshed_game = self.db.get_mini_game(game["id"])
+        _, _, targets = mini_flow.voters_and_targets(self.db, teams, identities, refreshed_game)
+        view = VotingView(
+            db=self.db, flow=mini_flow, channel=ctx.channel, guild=ctx.guild,
+            session=session, game=refreshed_game, teams=teams, identities=identities,
+            targets=targets,
         )
+        message = await ctx.send(
+            f"输方: {losing}\n胜方: {winning}\n\n可以开始讨论，讨论结束后投票。",
+            view=view,
+        )
+        self.db.set_mini_vote_message_id(game["id"], message.id)
 
     @mini.command(name="override", description="[管理] 直接宣布本局结果，跳过整个投票流程")
     @app_commands.describe(

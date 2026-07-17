@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from .. import game_flow, game_logic, messages, mini_flow
+from .. import game_flow, mini_flow, views
 
 
 class VotingCog(commands.Cog):
@@ -67,43 +67,19 @@ class VotingCog(commands.Cog):
             return
 
         flow = game_flow if mode == "ranked" else mini_flow
-        get_votes = self.db.get_votes if mode == "ranked" else self.db.get_mini_votes
-        record_vote = self.db.record_vote if mode == "ranked" else self.db.record_mini_vote
-
-        round_no, voters, targets = flow.voters_and_targets(self.db, teams, identities, game)
-
-        try:
-            game_logic.validate_vote(voter_id, target_id, voters, targets)
-        except game_logic.VoteError as e:
-            options = ", ".join(messages.mention(t) for t in targets) or "无"
-            await ctx.send(f"❌ {e}\n\n可投对象: {options}", ephemeral=True)
-            return
-
-        record_vote(game["id"], round_no, voter_id, target_id)
-        votes = get_votes(game["id"], round_no)
-        await ctx.send(
-            f"{messages.JELLY} 已记录你的第 {round_no} 轮投票 ({len(votes)}/{len(voters)})", ephemeral=True
-        )
-
         channel = self.bot.get_channel(int(session["channel_id"]))
         if channel is None:
+            await ctx.send("找不到本场次的频道。", ephemeral=True)
             return
 
-        if len(votes) < len(voters):
-            await channel.send(messages.vote_status_text(round_no, len(votes), len(voters)))
-            return
+        async def reply(content, ephemeral=False):
+            await ctx.send(content, ephemeral=ephemeral)
 
-        try:
-            if mode == "ranked":
-                result = game_flow.resolve_current_round(self.db, session, game, teams, identities)
-            else:
-                result = mini_flow.resolve_current_round(self.db, game, teams, identities)
-        except game_logic.VoteError as e:
-            cmd = "/game closevote" if mode == "ranked" else "/mini closevote"
-            await channel.send(f"⚠️ 自动结算失败，请使用 {cmd} 处理: {e}")
-            return
-        if result:
-            await channel.send(f"{messages.JELLY} 全员已投票，自动结算第 {round_no} 轮:\n\n{result}")
+        await views.cast_vote(
+            db=self.db, flow=flow, channel=channel, guild=ctx.guild, session=session,
+            game=game, teams=teams, identities=identities, voter_id=voter_id,
+            target_id=target_id, reply=reply,
+        )
 
 
 async def setup(bot):

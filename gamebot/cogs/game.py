@@ -6,7 +6,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from .. import config, game_flow, game_logic, messages
-from ..views import IdentityRevealView
+from ..views import IdentityRevealView, VotingView
 
 
 class GameCog(commands.Cog):
@@ -140,7 +140,7 @@ class GameCog(commands.Cog):
             await ctx.send(f"输方队伍必须是 {' 或 '.join(config.TEAMS)}。", ephemeral=True)
             return
 
-        _, identities = self.db.get_teams_and_identities(game["id"])
+        teams, identities = self.db.get_teams_and_identities(game["id"])
         confirmed_ids = {
             row["player_id"] for row in self.db.get_game_players(game["id"]) if row["confirmed"]
         }
@@ -154,9 +154,18 @@ class GameCog(commands.Cog):
 
         winning = [t for t in config.TEAMS if t != losing][0]
         self.db.set_game_result(game["id"], losing, winning)
-        await ctx.send(
-            f"输方: {losing}\n胜方: {winning}\n\n可以开始讨论，讨论结束后使用 /vote 进行第一轮投票。"
+        refreshed_game = self.db.get_game(game["id"])
+        _, _, targets = game_flow.voters_and_targets(self.db, teams, identities, refreshed_game)
+        view = VotingView(
+            db=self.db, flow=game_flow, channel=ctx.channel, guild=ctx.guild,
+            session=session, game=refreshed_game, teams=teams, identities=identities,
+            targets=targets,
         )
+        message = await ctx.send(
+            f"输方: {losing}\n胜方: {winning}\n\n可以开始讨论，讨论结束后投票。",
+            view=view,
+        )
+        self.db.set_vote_message_id(game["id"], message.id)
 
     @game.command(name="override", description="[管理] 直接宣布本局结果，跳过整个投票流程")
     @app_commands.describe(
