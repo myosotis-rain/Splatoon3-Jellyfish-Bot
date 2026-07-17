@@ -198,8 +198,10 @@ class VotingView(discord.ui.View):
         self.identities = identities
 
         for target_id in sorted(targets):
-            member = guild.get_member(int(target_id))
-            label = member.display_name if member else target_id
+            label = db.get_username(target_id)
+            if label is None:
+                member = guild.get_member(int(target_id))
+                label = member.display_name if member else target_id
             button = discord.ui.Button(label=label, style=discord.ButtonStyle.secondary)
             button.callback = self._make_callback(target_id)
             self.add_item(button)

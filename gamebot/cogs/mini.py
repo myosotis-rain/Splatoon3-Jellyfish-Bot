@@ -37,7 +37,7 @@ class MiniCog(commands.Cog):
         if session is None:
             session_id = self.db.create_mini_session(ctx.guild.id, ctx.channel.id)
             session = self.db.get_mini_session(session_id)
-        self.db.join_mini_session(session["id"], ctx.author.id, str(ctx.author))
+        self.db.join_mini_session(session["id"], ctx.author.id, ctx.author.display_name)
         count = len(self.db.get_mini_session_players(session["id"]))
         await ctx.send(
             f"{messages.JELLY} {ctx.author.display_name} 已加入 Mini 名单\n\n"

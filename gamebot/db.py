@@ -150,6 +150,22 @@ class Database:
         )
         self.conn.commit()
 
+    def ensure_player_seen(self, discord_id, default_username):
+        """Like upsert_player, but only sets the name the first time this
+        player is seen -- never clobbers a name set via /rename."""
+        self.conn.execute(
+            "INSERT INTO players (discord_id, username) VALUES (?, ?) "
+            "ON CONFLICT(discord_id) DO NOTHING",
+            (str(discord_id), default_username),
+        )
+        self.conn.commit()
+
+    def get_username(self, discord_id):
+        row = self.conn.execute(
+            "SELECT username FROM players WHERE discord_id = ?", (str(discord_id),)
+        ).fetchone()
+        return row["username"] if row else None
+
     # -- sessions ------------------------------------------------------
 
     def get_active_session(self, server_id):
@@ -203,7 +219,7 @@ class Database:
         return cur.rowcount > 0
 
     def join_session(self, session_id, player_id, username):
-        self.upsert_player(player_id, username)
+        self.ensure_player_seen(player_id, username)
         row = self.conn.execute(
             "SELECT 1 FROM session_players WHERE session_id = ? AND player_id = ?",
             (session_id, str(player_id)),
@@ -490,7 +506,7 @@ class Database:
         self.conn.commit()
 
     def join_mini_session(self, session_id, player_id, username):
-        self.upsert_player(player_id, username)
+        self.ensure_player_seen(player_id, username)
         row = self.conn.execute(
             "SELECT 1 FROM mini_session_players WHERE session_id = ? AND player_id = ?",
             (session_id, str(player_id)),

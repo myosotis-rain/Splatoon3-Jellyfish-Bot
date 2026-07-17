@@ -53,7 +53,7 @@ class SessionCog(commands.Cog):
                 "当前没有进行中的场次，请先使用 /session start 创建。", ephemeral=True
             )
             return
-        self.db.join_session(session["id"], ctx.author.id, str(ctx.author))
+        self.db.join_session(session["id"], ctx.author.id, ctx.author.display_name)
         count = len(self.db.get_session_players(session["id"]))
         await ctx.send(
             f"{messages.JELLY} {ctx.author.display_name} 已加入本次活动\n\n当前参与人数:\n{count}"

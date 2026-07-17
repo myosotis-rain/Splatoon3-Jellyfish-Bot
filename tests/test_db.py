@@ -27,6 +27,34 @@ def test_creating_new_session_closes_previous_active_one(db):
     assert first["status"] == "closed"
 
 
+def test_get_username_returns_none_for_unseen_player(db):
+    assert db.get_username(999) is None
+
+
+def test_upsert_player_always_overwrites(db):
+    db.upsert_player(111, "Sophia")
+    db.upsert_player(111, "CustomName")
+    assert db.get_username(111) == "CustomName"
+
+
+def test_ensure_player_seen_does_not_clobber_existing_name(db):
+    db.upsert_player(111, "CustomName")
+    db.ensure_player_seen(111, "DiscordDisplayName")
+    assert db.get_username(111) == "CustomName"
+
+
+def test_ensure_player_seen_sets_name_for_new_player(db):
+    db.ensure_player_seen(111, "DiscordDisplayName")
+    assert db.get_username(111) == "DiscordDisplayName"
+
+
+def test_join_session_does_not_clobber_a_rename(db):
+    session_id = db.create_session("server1", "chan1")
+    db.upsert_player(111, "CustomName")
+    db.join_session(session_id, 111, "DiscordDisplayName")
+    assert db.get_username(111) == "CustomName"
+
+
 def test_join_and_leave_session(db):
     session_id = db.create_session("server1", "chan1")
     db.join_session(session_id, 111, "Sophia")
