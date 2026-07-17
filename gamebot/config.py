@@ -1,0 +1,21 @@
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "")
+DATABASE_PATH = os.getenv("DATABASE_PATH", "gamebot.db")
+
+TEAM_SIZE = 4
+GAME_SIZE = TEAM_SIZE * 2
+TEAMS = ("A", "B")
+
+MINI_TEAM_SIZE = 3
+MINI_GAME_SIZE = MINI_TEAM_SIZE * 2
+
+IDENTITY_UNDERCOVER = "卧底"
+IDENTITY_DUMMY = "呆呆鱿"
+IDENTITY_GOOD = "好鱿"
+
+IDENTITIES_NEEDING_CONFIRMATION = (IDENTITY_UNDERCOVER, IDENTITY_DUMMY)
