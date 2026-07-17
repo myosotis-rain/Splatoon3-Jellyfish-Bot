@@ -6,7 +6,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from .. import config, game_flow, game_logic, messages
-from ..views import ConfirmView
+from ..views import IdentityRevealView
 
 
 class GameCog(commands.Cog):
@@ -90,30 +90,11 @@ class GameCog(commands.Cog):
         self.db.save_team_assignment(game_id, teams, identities)
         self.db.set_game_status(game_id, "confirming")
 
-        await ctx.send(messages.team_announcement_text(game_number, teams))
-
-        dm_failures = []
-        for player_id in players:
-            identity, team = self.db.get_identity(game_id, player_id)
-            member = ctx.guild.get_member(int(player_id))
-            if member is None:
-                dm_failures.append(player_id)
-                continue
-            try:
-                card = messages.identity_card_text(team, identity)
-                if identity in config.IDENTITIES_NEEDING_CONFIRMATION:
-                    view = ConfirmView(self.db, game_id, int(player_id))
-                    await member.send(card, view=view)
-                else:
-                    await member.send(card)
-            except discord.Forbidden:
-                dm_failures.append(player_id)
-
-        if dm_failures:
-            mentions = ", ".join(messages.mention(p) for p in dm_failures)
-            await ctx.send(
-                f"⚠️ 以下玩家私信发送失败，请确认已开启「允许来自服务器成员的私信」: {mentions}"
-            )
+        view = IdentityRevealView(
+            self.db, game_id, teams, identities,
+            track_confirmation=True, card_text_fn=messages.identity_card_text,
+        )
+        await ctx.send(messages.team_announcement_text(game_number, teams), view=view)
 
     @game.command(name="status", description="查看当前游戏状态")
     async def status(self, ctx: commands.Context):
@@ -123,7 +104,7 @@ class GameCog(commands.Cog):
         except RuntimeError as e:
             await ctx.send(str(e), ephemeral=True)
             return
-        await ctx.send(f"🎮 Game #{game['game_number']}\n状态: {game['status']}")
+        await ctx.send(f"✦ Game #{game['game_number']}　状态: {game['status']}")
 
     @game.command(name="confirmations", description="查看特殊身份确认状态")
     async def confirmations(self, ctx: commands.Context):
