@@ -93,6 +93,21 @@ def find_undercover(teams, identities, team):
     raise ValueError(f"No undercover found on team {team}")
 
 
+def outcome_category(teams, identities, losing_team, eliminated_player):
+    """Classify how a game ended, for narrating the result:
+    'none' (no one was ever accused), 'caught' (the undercover was
+    eliminated), 'dummy' (the decoy was eliminated instead, so the
+    undercover escapes), or 'escaped' (a regular player was wrongly
+    eliminated)."""
+    if eliminated_player is None:
+        return "none"
+    if eliminated_player == find_undercover(teams, identities, losing_team):
+        return "caught"
+    if identities.get(eliminated_player) == config.IDENTITY_DUMMY:
+        return "dummy"
+    return "escaped"
+
+
 def confirmation_status(identities, confirmed_ids):
     """Returns (confirmed_count, needed_count) for special identities only."""
     needing = [

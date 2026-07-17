@@ -63,9 +63,8 @@ def resolve_runoff(db, game, teams, identities):
     db.set_mini_eliminated(game["id"], eliminated)
     db.complete_mini_game(game["id"])
 
-    losing_undercover = game_logic.find_undercover(teams, identities, game["losing_team"])
-    outcome = "🎉 抓到卧底了！" if eliminated == losing_undercover else "😅 卧底逃脱了！"
-    return f"被指认: {db.name_or_id(eliminated)}\n\n{outcome}"
+    category = game_logic.outcome_category(teams, identities, game["losing_team"], eliminated)
+    return f"被票出: {db.name_or_id(eliminated)}\n\n{messages.outcome_text(category)}"
 
 
 def resolve_current_round(db, game, teams, identities):

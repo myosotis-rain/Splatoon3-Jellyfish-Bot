@@ -211,12 +211,11 @@ class MiniCog(commands.Cog):
                 self.db.set_mini_eliminated(game["id"], eliminated)
             self.db.complete_mini_game(game["id"])
 
+            category = game_logic.outcome_category(teams, identities, losing, eliminated)
             if eliminated:
-                losing_undercover = game_logic.find_undercover(teams, identities, losing)
-                outcome = "🎉 抓到卧底了！" if eliminated == losing_undercover else "😅 卧底逃脱了！"
-                result_line = f"被抓: {self.db.name_or_id(eliminated)}\n\n{outcome}"
+                result_line = f"被抓: {self.db.name_or_id(eliminated)}\n\n{messages.outcome_text(category)}"
             else:
-                result_line = "😅 卧底未被抓到。"
+                result_line = messages.outcome_text(category)
 
             await interaction.followup.send(
                 f"⚡ 管理员直接宣布结果\n{messages.loss_result_line(losing, winning)}\n\n{result_line}"
@@ -285,10 +284,11 @@ class MiniCog(commands.Cog):
         async def do_resolvetie(interaction):
             self.db.set_mini_eliminated(game["id"], eliminated)
             self.db.complete_mini_game(game["id"])
-            losing_undercover = game_logic.find_undercover(teams, identities, game["losing_team"])
-            outcome = "🎉 抓到卧底了！" if eliminated == losing_undercover else "😅 卧底逃脱了！"
+            category = game_logic.outcome_category(
+                teams, identities, game["losing_team"], eliminated
+            )
             await interaction.followup.send(
-                f"被裁定为卧底: {self.db.name_or_id(eliminated)}\n\n{outcome}"
+                f"被裁定为卧底: {self.db.name_or_id(eliminated)}\n\n{messages.outcome_text(category)}"
             )
 
         view = ConfirmActionView(ctx.author.id, do_resolvetie)
@@ -309,7 +309,13 @@ class MiniCog(commands.Cog):
             await ctx.send("本局投票尚未结束，无法公开身份。", ephemeral=True)
             return
         teams, identities = self.db.get_mini_teams_and_identities(game["id"])
-        await ctx.send(messages.reveal_text(teams, identities))
+        await ctx.send(
+            messages.reveal_text(teams, identities, game["losing_team"], game["winning_team"])
+        )
+        category = game_logic.outcome_category(
+            teams, identities, game["losing_team"], game["eliminated_player"]
+        )
+        await ctx.send(messages.outcome_text(category))
 
 
 async def setup(bot):

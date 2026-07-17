@@ -230,6 +230,8 @@ class GameCog(commands.Cog):
 
         async def do_override(interaction):
             self.db.set_game_result(game["id"], losing, winning)
+            if eliminated:
+                self.db.set_eliminated(game["id"], eliminated)
             scores = game_logic.calculate_scores(
                 teams=teams,
                 identities=identities,
@@ -347,7 +349,13 @@ class GameCog(commands.Cog):
             await ctx.send("本局投票尚未结束，无法公开身份。", ephemeral=True)
             return
         teams, identities = self.db.get_teams_and_identities(game["id"])
-        await ctx.send(messages.reveal_text(teams, identities))
+        await ctx.send(
+            messages.reveal_text(teams, identities, game["losing_team"], game["winning_team"])
+        )
+        category = game_logic.outcome_category(
+            teams, identities, game["losing_team"], game["eliminated_player"]
+        )
+        await ctx.send(messages.outcome_text(category))
 
 
 async def setup(bot):

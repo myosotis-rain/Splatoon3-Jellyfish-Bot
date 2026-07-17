@@ -72,7 +72,7 @@ def resolve_runoff(db, session, game, teams, identities):
         final_round_votes=final_round_votes,
     )
     db.finalize_scores(session["id"], game["id"], scores)
-    lines = [f"被指认: {db.name_or_id(eliminated)}\n", "本局积分:"]
+    lines = [f"被票出: {db.name_or_id(eliminated)}\n", "本局积分:"]
     for player_id, score in scores.items():
         lines.append(f"{db.name_or_id(player_id)}: {score:+d}")
     return "\n".join(lines)

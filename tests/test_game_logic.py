@@ -111,6 +111,26 @@ def test_find_undercover_missing_raises():
         game_logic.find_undercover(teams, identities, "A")
 
 
+def test_outcome_category_caught():
+    teams, identities = _make_game()
+    assert game_logic.outcome_category(teams, identities, "A", "a1") == "caught"
+
+
+def test_outcome_category_dummy():
+    teams, identities = _make_game()
+    assert game_logic.outcome_category(teams, identities, "A", "a2") == "dummy"
+
+
+def test_outcome_category_escaped():
+    teams, identities = _make_game()
+    assert game_logic.outcome_category(teams, identities, "A", "a3") == "escaped"
+
+
+def test_outcome_category_none():
+    teams, identities = _make_game()
+    assert game_logic.outcome_category(teams, identities, "A", None) == "none"
+
+
 def test_confirmation_status_counts_special_identities_only():
     _, identities = _make_game()
     confirmed, needed = game_logic.confirmation_status(identities, {"a1"})

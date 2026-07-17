@@ -27,6 +27,11 @@ IDENTITY_TASKS = {
     config.IDENTITY_GOOD: "帮助队伍获胜",
 }
 
+IDENTITY_EMOJI = {
+    config.IDENTITY_UNDERCOVER: "🫥",
+    config.IDENTITY_DUMMY: "🐡",
+}
+
 IDENTITY_SCORING = {
     config.IDENTITY_UNDERCOVER: (
         "基础分: +1\n"
@@ -110,15 +115,32 @@ def confirmation_status_text(confirmed, needed):
     return text
 
 
-def reveal_text(teams, identities):
+def reveal_text(teams, identities, losing_team, winning_team):
     lines = [f"🎨 {STAR} 身份揭晓 {STAR}", ""]
     for team, player_ids in teams.items():
         emoji = TEAM_EMOJI.get(team, team)
-        entries = "　".join(f"{mention(p)}: {identities[p]}" for p in player_ids)
-        lines.append(f"{emoji} {team}　{entries}")
-    lines.append("")
+        result = "落败" if team == losing_team else "胜利"
+        lines.append(f"{emoji} {team}　{result}")
+        for player_id in player_ids:
+            identity = identities[player_id]
+            id_emoji = IDENTITY_EMOJI.get(identity)
+            label = f"{id_emoji} {identity}" if id_emoji else identity
+            lines.append(f"{mention(player_id)}: {label}")
+        lines.append("")
     lines.append(CLOSING_FLOURISH)
     return "\n".join(lines).strip()
+
+
+OUTCOME_LINES = {
+    "none": "😅 卧底未被抓到。",
+    "caught": "🎉 抓到卧底了！",
+    "dummy": "🐡 呆呆鱿成功被票出，卧底逃脱了！",
+    "escaped": "😅 卧底逃脱了！",
+}
+
+
+def outcome_text(category):
+    return OUTCOME_LINES[category]
 
 
 RANK_GLYPHS = {1: "✦", 2: "❀", 3: "⋆"}
@@ -130,12 +152,12 @@ def leaderboard_text(board):
     lines = [f"🐚 {STAR} 本次活动积分 {STAR}", ""]
     for i, entry in enumerate(board, start=1):
         glyph = RANK_GLYPHS.get(i, "·")
+        lines.append(f"{glyph} 第 {i} 名 · {entry['username']}")
         lines.append(
-            f"{glyph} 第 {i} 名 · {entry['username']}　"
             f"场次 {entry['games_played']}｜总分 {entry['total_score']}｜"
             f"均分 {entry['average']:.2f}"
         )
-    lines.append("")
+        lines.append("")
     lines.append(CLOSING_FLOURISH)
     return "\n".join(lines).strip()
 
