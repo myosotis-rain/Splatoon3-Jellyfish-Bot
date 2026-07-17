@@ -26,12 +26,12 @@ class SessionCog(commands.Cog):
     @commands.guild_only()
     async def session(self, ctx: commands.Context):
         await ctx.send(
-            "请使用 /session create|join|leave|leaderboard|status|list|reopen|end", ephemeral=True
+            "请使用 /session start|join|leave|leaderboard|status|list|reopen|end", ephemeral=True
         )
 
-    @session.command(name="create", description="创建新的游戏活动场次")
+    @session.command(name="start", description="创建新的游戏活动场次")
     @app_commands.describe(name="场次名称，例如 2026-07-16 Game Night")
-    async def create(self, ctx: commands.Context, *, name: str = None):
+    async def start(self, ctx: commands.Context, *, name: str = None):
         existing = self.db.get_active_session(ctx.guild.id)
         if existing is not None:
             title = existing["name"] or f"Session #{existing['id']}"
@@ -50,7 +50,7 @@ class SessionCog(commands.Cog):
         session = self.db.get_active_session(ctx.guild.id)
         if session is None:
             await ctx.send(
-                "当前没有进行中的场次，请先使用 /session create 创建。", ephemeral=True
+                "当前没有进行中的场次，请先使用 /session start 创建。", ephemeral=True
             )
             return
         self.db.join_session(session["id"], ctx.author.id, str(ctx.author))

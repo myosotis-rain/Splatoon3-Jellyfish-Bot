@@ -17,7 +17,7 @@ class GameCog(commands.Cog):
     def _require_session(self, ctx):
         session = self.db.get_active_session(ctx.guild.id)
         if session is None:
-            raise RuntimeError("当前没有进行中的场次，请先使用 /session create 创建。")
+            raise RuntimeError("当前没有进行中的场次，请先使用 /session start 创建。")
         return session
 
     def _require_game(self, session):
@@ -34,27 +34,33 @@ class GameCog(commands.Cog):
             ephemeral=True,
         )
 
-    @game.command(name="testidentity", description="[测试] 给自己私信一张随机身份卡，不影响任何场次/游戏")
+    @game.command(name="testidentity", description="[测试] 预览随机身份卡样式，不影响任何场次/游戏")
     @app_commands.describe(mode="卧底游戏 (ranked) 还是 Mini 3v3 (mini) 的卡面格式")
     async def testidentity(self, ctx: commands.Context, mode: Literal["ranked", "mini"] = "ranked"):
         team = random.choice(config.TEAMS)
+        player_id = str(ctx.author.id)
         if mode == "mini":
             identity = random.choice([config.IDENTITY_UNDERCOVER, config.IDENTITY_GOOD])
-            card = messages.mini_identity_card_text(team, identity)
+            card_text_fn = messages.mini_identity_card_text
+            track_confirmation = False
         else:
             identity = random.choice(
                 [config.IDENTITY_UNDERCOVER, config.IDENTITY_DUMMY, config.IDENTITY_GOOD]
             )
-            card = messages.identity_card_text(team, identity)
+            card_text_fn = messages.identity_card_text
+            track_confirmation = True
 
-        try:
-            await ctx.author.send(card)
-        except discord.Forbidden:
-            await ctx.send(
-                "⚠️ 私信发送失败，请确认已开启「允许来自服务器成员的私信」", ephemeral=True
-            )
-            return
-        await ctx.send(f"{messages.JELLY} 已发送测试身份卡 ({mode}) 到你的私信", ephemeral=True)
+        # game_id=0 is a sentinel that can never match a real game (ids are
+        # autoincrement from 1), so set_confirmed/get_game_players below are
+        # harmless no-ops -- this reuses the exact same view real games use.
+        view = IdentityRevealView(
+            self.db, 0, {team: [player_id]}, {player_id: identity},
+            track_confirmation=track_confirmation, card_text_fn=card_text_fn,
+        )
+        await ctx.send(
+            f"[测试] 点击下方按钮查看身份卡样式 ({mode})，不影响任何场次/游戏",
+            view=view, ephemeral=True,
+        )
 
     @game.command(name="start", description="开始新的一局游戏")
     async def start(self, ctx: commands.Context):
@@ -93,6 +99,7 @@ class GameCog(commands.Cog):
         view = IdentityRevealView(
             self.db, game_id, teams, identities,
             track_confirmation=True, card_text_fn=messages.identity_card_text,
+            session=session,
         )
         await ctx.send(messages.team_announcement_text(game_number, teams), view=view)
 
@@ -162,7 +169,7 @@ class GameCog(commands.Cog):
             targets=targets,
         )
         message = await ctx.send(
-            f"输方: {losing}\n胜方: {winning}\n\n可以开始讨论，讨论结束后投票。",
+            f"{messages.loss_result_line(losing, winning)}\n\n可以开始讨论，讨论结束后投票。",
             view=view,
         )
         self.db.set_vote_message_id(game["id"], message.id)
@@ -215,7 +222,7 @@ class GameCog(commands.Cog):
         )
         self.db.finalize_scores(session["id"], game["id"], scores)
 
-        lines = [f"⚡ 管理员直接宣布结果\n输方: {losing}\n胜方: {winning}\n"]
+        lines = [f"⚡ 管理员直接宣布结果\n{messages.loss_result_line(losing, winning)}\n"]
         if eliminated:
             lines.append(f"被抓: {messages.mention(eliminated)}\n")
         lines.append("本局积分:")

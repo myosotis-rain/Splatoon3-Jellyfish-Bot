@@ -32,7 +32,7 @@ class IdentityRevealView(discord.ui.View):
     button with a single step. Not persisted across bot restarts (same
     accepted limitation as ConfirmView)."""
 
-    def __init__(self, db, game_id, teams, identities, track_confirmation, card_text_fn):
+    def __init__(self, db, game_id, teams, identities, track_confirmation, card_text_fn, session=None):
         super().__init__(timeout=None)
         self.db = db
         self.game_id = game_id
@@ -40,6 +40,7 @@ class IdentityRevealView(discord.ui.View):
         self.identities = identities
         self.track_confirmation = track_confirmation
         self.card_text_fn = card_text_fn
+        self.session = session
         self._announced = False
 
     def _team_of(self, player_id):
@@ -74,9 +75,68 @@ class IdentityRevealView(discord.ui.View):
         confirmed, needed = game_logic.confirmation_status(self.identities, confirmed_ids)
         if confirmed >= needed:
             self._announced = True
-            await interaction.message.edit(
-                content=f"{interaction.message.content}\n\n{messages.all_confirmed_line()}"
+            loss_view = LossDeclareView(
+                db=self.db, channel=interaction.channel, guild=interaction.guild,
+                session=self.session, game_id=self.game_id, teams=self.teams,
+                identities=self.identities,
             )
+            await interaction.message.edit(
+                content=f"{interaction.message.content}\n\n{messages.all_confirmed_line()}",
+                view=loss_view,
+            )
+
+
+class LossDeclareView(discord.ui.View):
+    """Replaces IdentityRevealView on the team-announcement message once
+    every special identity is confirmed (ranked only -- mini has no
+    confirmation gate to wait for, so it keeps the typed /mini result
+    path only). Clicking a team's button turns this same message into
+    the round-1 voting message, no new message needed. Not persisted
+    across bot restarts (same accepted limitation as the other views)."""
+
+    def __init__(self, *, db, channel, guild, session, game_id, teams, identities):
+        super().__init__(timeout=None)
+        self.db = db
+        self.channel = channel
+        self.guild = guild
+        self.session = session
+        self.game_id = game_id
+        self.teams = teams
+        self.identities = identities
+
+        for losing in config.TEAMS:
+            winning = [t for t in config.TEAMS if t != losing][0]
+            emoji = messages.TEAM_EMOJI.get(losing, losing)
+            button = discord.ui.Button(
+                label=f"{emoji} {losing} 落败", style=discord.ButtonStyle.danger
+            )
+            button.callback = self._make_callback(losing, winning)
+            self.add_item(button)
+
+    def _make_callback(self, losing, winning):
+        async def callback(interaction):
+            game = self.db.get_game(self.game_id)
+            if game["status"] != "confirming":
+                await interaction.response.send_message("本局结果已经记录过了。", ephemeral=True)
+                return
+
+            self.db.set_game_result(self.game_id, losing, winning)
+            refreshed_game = self.db.get_game(self.game_id)
+            _, _, targets = game_flow.voters_and_targets(
+                self.db, self.teams, self.identities, refreshed_game
+            )
+            voting_view = VotingView(
+                db=self.db, flow=game_flow, channel=self.channel, guild=self.guild,
+                session=self.session, game=refreshed_game, teams=self.teams,
+                identities=self.identities, targets=targets,
+            )
+            content = (
+                f"{interaction.message.content}\n\n"
+                f"{messages.loss_result_line(losing, winning)}\n\n可以开始讨论，讨论结束后投票。"
+            )
+            await interaction.response.edit_message(content=content, view=voting_view)
+            self.db.set_vote_message_id(self.game_id, interaction.message.id)
+        return callback
 
 
 class VotingView(discord.ui.View):
@@ -148,7 +208,7 @@ async def cast_vote(*, db, flow, channel, guild, session, game, teams, identitie
         game_logic.validate_vote(voter_id, target_id, voters, targets)
     except game_logic.VoteError as e:
         options = ", ".join(messages.mention(t) for t in targets) or "无"
-        await reply(f"❌ {e}\n\n可投对象: {options}", ephemeral=True)
+        await reply(f"⚠️ {e}\n\n可投对象: {options}", ephemeral=True)
         return
 
     ops["record_vote"](db, game["id"], round_no, voter_id, target_id)

@@ -165,7 +165,7 @@ class MiniCog(commands.Cog):
             targets=targets,
         )
         message = await ctx.send(
-            f"输方: {losing}\n胜方: {winning}\n\n可以开始讨论，讨论结束后投票。",
+            f"{messages.loss_result_line(losing, winning)}\n\n可以开始讨论，讨论结束后投票。",
             view=view,
         )
         self.db.set_mini_vote_message_id(game["id"], message.id)
@@ -216,7 +216,9 @@ class MiniCog(commands.Cog):
         else:
             result_line = "😅 卧底未被抓到。"
 
-        await ctx.send(f"⚡ 管理员直接宣布结果\n输方: {losing}\n胜方: {winning}\n\n{result_line}")
+        await ctx.send(
+            f"⚡ 管理员直接宣布结果\n{messages.loss_result_line(losing, winning)}\n\n{result_line}"
+        )
 
     @mini.command(name="closevote", description="结束当前一轮投票并进入下一阶段")
     async def closevote(self, ctx: commands.Context):
