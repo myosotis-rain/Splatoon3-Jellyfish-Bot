@@ -102,7 +102,8 @@ class GameCog(commands.Cog):
             track_confirmation=True, card_text_fn=messages.identity_card_text,
             session=session,
         )
-        await reply(messages.team_announcement_text(game_number, teams), view)
+        names = {p: self.db.name_or_id(p) for players in teams.values() for p in players}
+        await reply(messages.team_announcement_text(game_number, teams, names), view)
 
     @game.command(name="start", description="开始新的一局游戏（随机分队）")
     async def start(self, ctx: commands.Context):

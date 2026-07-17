@@ -132,7 +132,8 @@ class MiniCog(commands.Cog):
             self.db, game_id, teams, identities,
             track_confirmation=False, card_text_fn=messages.mini_identity_card_text,
         )
-        await reply(messages.team_announcement_text(game_number, teams, label="Mini"), view)
+        names = {p: self.db.name_or_id(p) for players in teams.values() for p in players}
+        await reply(messages.team_announcement_text(game_number, teams, names, label="Mini"), view)
 
     @mini.command(name="start", description="开始新的一局 Mini 3v3（随机分队）")
     async def start(self, ctx: commands.Context):

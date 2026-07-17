@@ -71,13 +71,14 @@ def vote_tally_text(tally):
     return "\n".join(lines)
 
 
-def team_announcement_text(game_number, teams, label="Game"):
+def team_announcement_text(game_number, teams, names, label="Game"):
     lines = [f"{STAR} {label} #{game_number} {STAR}", ""]
     for team, player_ids in teams.items():
         emoji = TEAM_EMOJI.get(team, team)
-        mentions = "  ".join(mention(p) for p in player_ids)
-        lines.append(f"{emoji} {team}　{mentions}")
-    lines.append("")
+        lines.append(f"{emoji} {team}")
+        for player_id in player_ids:
+            lines.append(names[player_id])
+        lines.append("")
     lines.append(CLOSING_FLOURISH)
     return "\n".join(lines).strip()
 

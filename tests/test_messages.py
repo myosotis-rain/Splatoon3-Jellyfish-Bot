@@ -34,12 +34,13 @@ def test_vote_tally_text_lists_each_count():
 
 def test_team_announcement_text_contains_all_players_and_emoji():
     teams = {"A": ["p1", "p2"], "B": ["p3", "p4"]}
-    text = messages.team_announcement_text(3, teams)
+    names = {"p1": "Sophia", "p2": "Alex", "p3": "Bob", "p4": "Chris"}
+    text = messages.team_announcement_text(3, teams, names)
     assert "Game #3" in text
     assert "🔴 A" in text
     assert "🔵 B" in text
-    for pid in ("p1", "p2", "p3", "p4"):
-        assert messages.mention(pid) in text
+    for name in ("Sophia", "Alex", "Bob", "Chris"):
+        assert name in text
 
 
 def test_identity_card_text_undercover():
