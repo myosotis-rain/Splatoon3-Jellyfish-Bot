@@ -6,7 +6,6 @@ load_dotenv()
 
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "")
 DATABASE_PATH = os.getenv("DATABASE_PATH", "gamebot.db")
-GUILD_ID = os.getenv("GUILD_ID", "")
 
 TEAM_SIZE = 4
 GAME_SIZE = TEAM_SIZE * 2
