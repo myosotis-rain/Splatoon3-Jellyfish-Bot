@@ -5,6 +5,12 @@ def test_mention_format():
     assert messages.mention("123") == "<@123>"
 
 
+def test_loss_result_line_shows_both_team_emoji():
+    text = messages.loss_result_line("A", "B")
+    assert "🦑 A" in text
+    assert "🐙 B" in text
+
+
 def test_team_announcement_text_contains_all_players_and_emoji():
     teams = {"A": ["p1", "p2"], "B": ["p3", "p4"]}
     text = messages.team_announcement_text(3, teams)

@@ -47,6 +47,12 @@ def mention(player_id):
     return f"<@{player_id}>"
 
 
+def loss_result_line(losing_team, winning_team):
+    losing_emoji = TEAM_EMOJI.get(losing_team, losing_team)
+    winning_emoji = TEAM_EMOJI.get(winning_team, winning_team)
+    return f"{losing_emoji} {losing_team} 落败　{winning_emoji} {winning_team} 胜利"
+
+
 def team_announcement_text(game_number, teams, label="Game"):
     lines = [f"{STAR} {label} #{game_number} {STAR}", ""]
     for team, player_ids in teams.items():
