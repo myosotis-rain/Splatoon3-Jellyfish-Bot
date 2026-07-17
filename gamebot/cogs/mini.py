@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from .. import config, game_logic, messages, mini_flow
+from .. import config, game_logic, messages, mini_flow, views
 from ..views import ConfirmActionView, IdentityRevealView, VotingView
 
 
@@ -246,6 +246,7 @@ class MiniCog(commands.Cog):
         teams, identities = self.db.get_mini_teams_and_identities(game["id"])
 
         async def do_closevote(interaction):
+            round_no, _, _ = mini_flow.voters_and_targets(self.db, teams, identities, game)
             try:
                 msg = mini_flow.resolve_current_round(self.db, game, teams, identities)
             except game_logic.VoteError as e:
@@ -254,7 +255,11 @@ class MiniCog(commands.Cog):
             if msg is None:
                 await interaction.followup.send("这一轮还没有人投票。", ephemeral=True)
                 return
-            await interaction.followup.send(msg)
+            await views.apply_round_result(
+                db=self.db, flow=mini_flow, channel=ctx.channel, guild=ctx.guild,
+                session=session, game=game, teams=teams, identities=identities,
+                round_no=round_no, result=msg,
+            )
 
         view = ConfirmActionView(ctx.author.id, do_closevote)
         await ctx.send(

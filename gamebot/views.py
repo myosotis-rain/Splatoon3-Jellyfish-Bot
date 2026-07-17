@@ -238,6 +238,44 @@ def _mode_ops(flow):
     )
 
 
+async def _fetch_vote_message(db, flow, channel, game_id):
+    message_id = db.get_vote_message_id(game_id) if flow is game_flow \
+        else db.get_mini_vote_message_id(game_id)
+    if message_id is None:
+        return None
+    return await channel.fetch_message(int(message_id))
+
+
+async def apply_round_result(*, db, flow, channel, guild, session, game, teams,
+                              identities, round_no, result):
+    """After a round resolves -- whether triggered by the last vote coming
+    in (cast_vote) or a manual /game closevote -- reflect it on the
+    tracked message: attach a fresh VotingView if another round opened
+    (a tie, or ranked's always-required round-2 runoff), or drop the
+    buttons if the game is now decided. Shared so closevote can't leave
+    stale/missing buttons the way it used to before this existed."""
+    ops = _mode_ops(flow)
+    message = await _fetch_vote_message(db, flow, channel, game["id"])
+    refreshed_game = ops["get_game"](db, game["id"])
+    content = f"{messages.JELLY} 已结算第 {round_no} 轮:\n\n{result}"
+
+    if refreshed_game["status"] in ("voting_round1", "voting_round2"):
+        _, _, next_targets = flow.voters_and_targets(db, teams, identities, refreshed_game)
+        next_view = VotingView(
+            db=db, flow=flow, channel=channel, guild=guild, session=session,
+            game=refreshed_game, teams=teams, identities=identities, targets=next_targets,
+        )
+        if message is not None:
+            await message.edit(content=content, view=next_view)
+        else:
+            message = await channel.send(content, view=next_view)
+        ops["set_vote_message_id"](db, refreshed_game["id"], message.id)
+    elif message is not None:
+        await message.edit(content=content, view=None)
+    else:
+        await channel.send(content)
+
+
 async def cast_vote(*, db, flow, channel, guild, session, game, teams, identities,
                      voter_id, target_id, reply):
     """Validate, record, and reflect one vote. Shared by VotingView's
@@ -260,17 +298,15 @@ async def cast_vote(*, db, flow, channel, guild, session, game, teams, identitie
         ephemeral=True,
     )
 
-    message_id = db.get_vote_message_id(game["id"]) if flow is game_flow \
-        else db.get_mini_vote_message_id(game["id"])
-    message = await channel.fetch_message(int(message_id)) if message_id else None
-    if message is None:
-        return
-
     if len(votes) < len(voters):
-        # No `view=` kwarg: Message.edit() leaves existing components
-        # untouched when the param is omitted, which is what we want here
-        # (only the status text changes; the vote buttons stay as-is).
-        await message.edit(content=messages.vote_status_text(round_no, len(votes), len(voters)))
+        message = await _fetch_vote_message(db, flow, channel, game["id"])
+        if message is not None:
+            # No `view=` kwarg: Message.edit() leaves existing components
+            # untouched when the param is omitted -- only the status text
+            # changes, the vote buttons stay as-is.
+            await message.edit(
+                content=messages.vote_status_text(round_no, len(votes), len(voters))
+            )
         return
 
     try:
@@ -279,21 +315,17 @@ async def cast_vote(*, db, flow, channel, guild, session, game, teams, identitie
         else:
             result = mini_flow.resolve_current_round(db, game, teams, identities)
     except game_logic.VoteError as e:
-        await message.edit(content=f"⚠️ 自动结算失败，请使用 {ops['closevote_cmd']} 处理: {e}", view=None)
+        message = await _fetch_vote_message(db, flow, channel, game["id"])
+        if message is not None:
+            await message.edit(
+                content=f"⚠️ 自动结算失败，请使用 {ops['closevote_cmd']} 处理: {e}", view=None
+            )
         return
 
     if result is None:
         return
 
-    refreshed_game = ops["get_game"](db, game["id"])
-    content = f"{messages.JELLY} 全员已投票，自动结算第 {round_no} 轮:\n\n{result}"
-    if refreshed_game["status"] in ("voting_round1", "voting_round2"):
-        _, _, next_targets = flow.voters_and_targets(db, teams, identities, refreshed_game)
-        next_view = VotingView(
-            db=db, flow=flow, channel=channel, guild=guild, session=session,
-            game=refreshed_game, teams=teams, identities=identities, targets=next_targets,
-        )
-        await message.edit(content=content, view=next_view)
-        ops["set_vote_message_id"](db, refreshed_game["id"], message.id)
-    else:
-        await message.edit(content=content, view=None)
+    await apply_round_result(
+        db=db, flow=flow, channel=channel, guild=guild, session=session, game=game,
+        teams=teams, identities=identities, round_no=round_no, result=result,
+    )
