@@ -25,6 +25,46 @@ class ConfirmView(discord.ui.View):
         await interaction.response.edit_message(view=self)
 
 
+class ConfirmActionView(discord.ui.View):
+    """Generic confirm/cancel gate in front of one-shot, hard-to-reverse
+    admin actions (override, closevote, resolvetie). Only the invoker can
+    confirm or cancel, and the action runs at most once. Not persisted
+    across bot restarts (same accepted limitation as the other views)."""
+
+    def __init__(self, invoker_id, on_confirm):
+        super().__init__(timeout=None)
+        self.invoker_id = invoker_id
+        self.on_confirm = on_confirm
+        self._done = False
+
+    async def _guard(self, interaction):
+        if interaction.user.id != self.invoker_id:
+            await interaction.response.send_message("只有发起者可以确认/取消。", ephemeral=True)
+            return False
+        if self._done:
+            await interaction.response.send_message("已经处理过了。", ephemeral=True)
+            return False
+        self._done = True
+        return True
+
+    @discord.ui.button(label="✦ 确认执行", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._guard(interaction):
+            return
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(view=self)
+        await self.on_confirm(interaction)
+
+    @discord.ui.button(label="取消", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._guard(interaction):
+            return
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(content="已取消。", view=self)
+
+
 class IdentityRevealView(discord.ui.View):
     """Attached to the team-announcement message. Each player clicks once
     to privately reveal their card; for undercover/dummy that same click

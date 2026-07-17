@@ -6,7 +6,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from .. import config, game_flow, game_logic, messages
-from ..views import IdentityRevealView, VotingView
+from ..views import ConfirmActionView, IdentityRevealView, VotingView
 
 
 class GameCog(commands.Cog):
@@ -30,7 +30,8 @@ class GameCog(commands.Cog):
     @commands.guild_only()
     async def game(self, ctx: commands.Context):
         await ctx.send(
-            "请使用 /game start|status|confirmations|result|closevote|resolvetie|reveal",
+            "请使用 /game start|status|confirmations|forceconfirm|result|"
+            "closevote|resolvetie|reveal",
             ephemeral=True,
         )
 
@@ -128,6 +129,22 @@ class GameCog(commands.Cog):
         confirmed, needed = game_logic.confirmation_status(identities, confirmed_ids)
         await ctx.send(messages.confirmation_status_text(confirmed, needed))
 
+    @game.command(name="forceconfirm", description="[管理] 强制将本局所有特殊身份标记为已确认")
+    async def forceconfirm(self, ctx: commands.Context):
+        try:
+            session = self._require_session(ctx)
+            game = self._require_game(session)
+        except RuntimeError as e:
+            await ctx.send(str(e), ephemeral=True)
+            return
+        _, identities = self.db.get_teams_and_identities(game["id"])
+        for player_id, identity in identities.items():
+            if identity in config.IDENTITIES_NEEDING_CONFIRMATION:
+                self.db.set_confirmed(game["id"], player_id)
+        await ctx.send(
+            f"{messages.JELLY} 已强制标记全部特殊身份为已确认，可以使用 /game result 开始投票。"
+        )
+
     @game.command(name="result", description="记录输方队伍并开始投票")
     @app_commands.describe(losing_team="输方队伍，A 或 B")
     @app_commands.choices(losing_team=[
@@ -211,24 +228,33 @@ class GameCog(commands.Cog):
             await ctx.send("被抓玩家必须是输方队伍成员。", ephemeral=True)
             return
 
-        self.db.set_game_result(game["id"], losing, winning)
-        scores = game_logic.calculate_scores(
-            teams=teams,
-            identities=identities,
-            losing_team=losing,
-            winning_team=winning,
-            eliminated_player=eliminated,
-            final_round_votes={},
-        )
-        self.db.finalize_scores(session["id"], game["id"], scores)
+        async def do_override(interaction):
+            self.db.set_game_result(game["id"], losing, winning)
+            scores = game_logic.calculate_scores(
+                teams=teams,
+                identities=identities,
+                losing_team=losing,
+                winning_team=winning,
+                eliminated_player=eliminated,
+                final_round_votes={},
+            )
+            self.db.finalize_scores(session["id"], game["id"], scores)
 
-        lines = [f"⚡ 管理员直接宣布结果\n{messages.loss_result_line(losing, winning)}\n"]
-        if eliminated:
-            lines.append(f"被抓: {messages.mention(eliminated)}\n")
-        lines.append("本局积分:")
-        for player_id, score in scores.items():
-            lines.append(f"{messages.mention(player_id)}: {score:+d}")
-        await ctx.send("\n".join(lines))
+            lines = [f"⚡ 管理员直接宣布结果\n{messages.loss_result_line(losing, winning)}\n"]
+            if eliminated:
+                lines.append(f"被抓: {messages.mention(eliminated)}\n")
+            lines.append("本局积分:")
+            for player_id, score in scores.items():
+                lines.append(f"{messages.mention(player_id)}: {score:+d}")
+            await interaction.followup.send("\n".join(lines))
+
+        caught_line = f"\n被抓: {messages.mention(eliminated)}" if eliminated else ""
+        view = ConfirmActionView(ctx.author.id, do_override)
+        await ctx.send(
+            f"⚠️ 即将直接宣布结果并跳过投票流程:\n{messages.loss_result_line(losing, winning)}"
+            f"{caught_line}\n\n确定吗？",
+            view=view, ephemeral=True,
+        )
 
     @game.command(name="closevote", description="结束当前一轮投票并进入下一阶段")
     async def closevote(self, ctx: commands.Context):
@@ -247,17 +273,21 @@ class GameCog(commands.Cog):
             )
             return
 
-        try:
-            msg = game_flow.resolve_current_round(self.db, session, game, teams, identities)
-        except game_logic.VoteError as e:
-            await ctx.send(str(e), ephemeral=True)
-            return
+        async def do_closevote(interaction):
+            try:
+                msg = game_flow.resolve_current_round(self.db, session, game, teams, identities)
+            except game_logic.VoteError as e:
+                await interaction.followup.send(str(e), ephemeral=True)
+                return
+            if msg is None:
+                await interaction.followup.send("这一轮还没有人投票。", ephemeral=True)
+                return
+            await interaction.followup.send(msg)
 
-        if msg is None:
-            await ctx.send("这一轮还没有人投票。", ephemeral=True)
-            return
-
-        await ctx.send(msg)
+        view = ConfirmActionView(ctx.author.id, do_closevote)
+        await ctx.send(
+            "⚠️ 即将提前结束本轮投票，只计算已投票的人。确定吗？", view=view, ephemeral=True
+        )
 
     @game.command(name="resolvetie", description="手动裁定投票结果，跳过自动重新投票")
     @app_commands.describe(player="被裁定为卧底的玩家")
@@ -274,21 +304,31 @@ class GameCog(commands.Cog):
 
         teams, identities = self.db.get_teams_and_identities(game["id"])
         eliminated = str(player.id)
-        self.db.set_eliminated(game["id"], eliminated)
-        final_round_votes = self.db.get_votes(game["id"], self.db.get_current_round(game["id"]))
-        scores = game_logic.calculate_scores(
-            teams=teams,
-            identities=identities,
-            losing_team=game["losing_team"],
-            winning_team=game["winning_team"],
-            eliminated_player=eliminated,
-            final_round_votes=final_round_votes,
+
+        async def do_resolvetie(interaction):
+            self.db.set_eliminated(game["id"], eliminated)
+            final_round_votes = self.db.get_votes(
+                game["id"], self.db.get_current_round(game["id"])
+            )
+            scores = game_logic.calculate_scores(
+                teams=teams,
+                identities=identities,
+                losing_team=game["losing_team"],
+                winning_team=game["winning_team"],
+                eliminated_player=eliminated,
+                final_round_votes=final_round_votes,
+            )
+            self.db.finalize_scores(session["id"], game["id"], scores)
+            lines = [f"被裁定指认: {messages.mention(eliminated)}\n", "本局积分:"]
+            for pid, score in scores.items():
+                lines.append(f"{messages.mention(pid)}: {score:+d}")
+            await interaction.followup.send("\n".join(lines))
+
+        view = ConfirmActionView(ctx.author.id, do_resolvetie)
+        await ctx.send(
+            f"⚠️ 即将裁定 {messages.mention(eliminated)} 为被指认对象，直接计分。确定吗？",
+            view=view, ephemeral=True,
         )
-        self.db.finalize_scores(session["id"], game["id"], scores)
-        lines = [f"被裁定指认: {messages.mention(eliminated)}\n", "本局积分:"]
-        for pid, score in scores.items():
-            lines.append(f"{messages.mention(pid)}: {score:+d}")
-        await ctx.send("\n".join(lines))
 
     @game.command(name="reveal", description="公开本局所有玩家身份（投票结束后才能使用）")
     async def reveal(self, ctx: commands.Context):

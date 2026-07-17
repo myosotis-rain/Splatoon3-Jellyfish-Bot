@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from .. import config, game_logic, messages, mini_flow
-from ..views import IdentityRevealView, VotingView
+from ..views import ConfirmActionView, IdentityRevealView, VotingView
 
 
 class MiniCog(commands.Cog):
@@ -204,20 +204,27 @@ class MiniCog(commands.Cog):
             await ctx.send("被抓玩家必须是输方队伍成员。", ephemeral=True)
             return
 
-        self.db.set_mini_game_result(game["id"], losing, winning)
-        if eliminated:
-            self.db.set_mini_eliminated(game["id"], eliminated)
-        self.db.complete_mini_game(game["id"])
+        async def do_override(interaction):
+            self.db.set_mini_game_result(game["id"], losing, winning)
+            if eliminated:
+                self.db.set_mini_eliminated(game["id"], eliminated)
+            self.db.complete_mini_game(game["id"])
 
-        if eliminated:
-            losing_undercover = game_logic.find_undercover(teams, identities, losing)
-            outcome = "🎉 抓到卧底了！" if eliminated == losing_undercover else "😅 卧底逃脱了！"
-            result_line = f"被抓: {messages.mention(eliminated)}\n\n{outcome}"
-        else:
-            result_line = "😅 卧底未被抓到。"
+            if eliminated:
+                losing_undercover = game_logic.find_undercover(teams, identities, losing)
+                outcome = "🎉 抓到卧底了！" if eliminated == losing_undercover else "😅 卧底逃脱了！"
+                result_line = f"被抓: {messages.mention(eliminated)}\n\n{outcome}"
+            else:
+                result_line = "😅 卧底未被抓到。"
 
+            await interaction.followup.send(
+                f"⚡ 管理员直接宣布结果\n{messages.loss_result_line(losing, winning)}\n\n{result_line}"
+            )
+
+        view = ConfirmActionView(ctx.author.id, do_override)
         await ctx.send(
-            f"⚡ 管理员直接宣布结果\n{messages.loss_result_line(losing, winning)}\n\n{result_line}"
+            f"⚠️ 即将直接宣布结果并跳过投票流程:\n{messages.loss_result_line(losing, winning)}\n\n确定吗？",
+            view=view, ephemeral=True,
         )
 
     @mini.command(name="closevote", description="结束当前一轮投票并进入下一阶段")
@@ -236,17 +243,22 @@ class MiniCog(commands.Cog):
             return
 
         teams, identities = self.db.get_mini_teams_and_identities(game["id"])
-        try:
-            msg = mini_flow.resolve_current_round(self.db, game, teams, identities)
-        except game_logic.VoteError as e:
-            await ctx.send(str(e), ephemeral=True)
-            return
 
-        if msg is None:
-            await ctx.send("这一轮还没有人投票。", ephemeral=True)
-            return
+        async def do_closevote(interaction):
+            try:
+                msg = mini_flow.resolve_current_round(self.db, game, teams, identities)
+            except game_logic.VoteError as e:
+                await interaction.followup.send(str(e), ephemeral=True)
+                return
+            if msg is None:
+                await interaction.followup.send("这一轮还没有人投票。", ephemeral=True)
+                return
+            await interaction.followup.send(msg)
 
-        await ctx.send(msg)
+        view = ConfirmActionView(ctx.author.id, do_closevote)
+        await ctx.send(
+            "⚠️ 即将提前结束本轮投票，只计算已投票的人。确定吗？", view=view, ephemeral=True
+        )
 
     @mini.command(name="resolvetie", description="手动裁定投票结果，跳过自动重新投票")
     @app_commands.describe(player="被裁定为卧底的玩家")
@@ -263,12 +275,19 @@ class MiniCog(commands.Cog):
 
         teams, identities = self.db.get_mini_teams_and_identities(game["id"])
         eliminated = str(player.id)
-        self.db.set_mini_eliminated(game["id"], eliminated)
-        self.db.complete_mini_game(game["id"])
 
-        losing_undercover = game_logic.find_undercover(teams, identities, game["losing_team"])
-        outcome = "🎉 抓到卧底了！" if eliminated == losing_undercover else "😅 卧底逃脱了！"
-        await ctx.send(f"被裁定指认: {messages.mention(eliminated)}\n\n{outcome}")
+        async def do_resolvetie(interaction):
+            self.db.set_mini_eliminated(game["id"], eliminated)
+            self.db.complete_mini_game(game["id"])
+            losing_undercover = game_logic.find_undercover(teams, identities, game["losing_team"])
+            outcome = "🎉 抓到卧底了！" if eliminated == losing_undercover else "😅 卧底逃脱了！"
+            await interaction.followup.send(f"被裁定指认: {messages.mention(eliminated)}\n\n{outcome}")
+
+        view = ConfirmActionView(ctx.author.id, do_resolvetie)
+        await ctx.send(
+            f"⚠️ 即将裁定 {messages.mention(eliminated)} 为被指认对象，结束本局。确定吗？",
+            view=view, ephemeral=True,
+        )
 
     @mini.command(name="reveal", description="公开本局所有玩家身份（投票结束后才能使用）")
     async def reveal(self, ctx: commands.Context):
