@@ -4,7 +4,9 @@ formatting can be unit tested without a live connection.
 
 from . import config
 
-TEAM_EMOJI = {"A": "🔴", "B": "🔵"}
+# Squid (Inkling) vs octopus (Octoling) -- Splatoon's own team split, standing
+# in for the plain red/blue dots this used to be.
+TEAM_EMOJI = {"A": "🦑", "B": "🐙"}
 
 # Decorative glyphs used to dress up bot output. JELLY replaces the plain
 # checkmark everywhere -- it's the one deliberate emoji exception, tying
@@ -46,13 +48,12 @@ def mention(player_id):
 
 
 def team_announcement_text(game_number, teams, label="Game"):
-    lines = [f"{STAR} {label} #{game_number} {STAR}\n"]
+    lines = [f"{STAR} {label} #{game_number} {STAR}", ""]
     for team, player_ids in teams.items():
         emoji = TEAM_EMOJI.get(team, team)
-        lines.append(f"{emoji} {team}")
-        for player_id in player_ids:
-            lines.append(mention(player_id))
-        lines.append("")
+        mentions = "  ".join(mention(p) for p in player_ids)
+        lines.append(f"{emoji} {team}　{mentions}")
+    lines.append("")
     lines.append(CLOSING_FLOURISH)
     return "\n".join(lines).strip()
 
@@ -62,14 +63,13 @@ def identity_card_text(team, identity):
     return (
         f"{CARD_TOP}\n"
         f"　　{STAR} 身份卡 {STAR}\n"
-        f"{CARD_BOTTOM}\n\n"
-        f"队伍　{STAR}　{emoji} {team}\n"
-        f"身份　{STAR}　{identity}\n\n"
+        f"{CARD_BOTTOM}\n"
+        f"队伍 {emoji} {team}　身份 {identity}\n\n"
         f"{SECTION_RULE} 任务 {SECTION_RULE}\n"
         f"{IDENTITY_TASKS[identity]}\n\n"
         f"{SECTION_RULE} 计分规则 {SECTION_RULE}\n"
-        f"{IDENTITY_SCORING[identity]}\n\n"
-        f"{CLOSING_FLOURISH}"
+        f"{IDENTITY_SCORING[identity]}\n"
+        f"{CARD_BOTTOM}"
     )
 
 
@@ -85,34 +85,32 @@ def mini_identity_card_text(team, identity):
         f"{CARD_TOP}\n"
         f"　　{STAR} 身份卡 · Mini 3v3 {STAR}\n"
         f"　　　　（不计分）\n"
-        f"{CARD_BOTTOM}\n\n"
-        f"队伍　{STAR}　{emoji} {team}\n"
-        f"身份　{STAR}　{identity}\n\n"
+        f"{CARD_BOTTOM}\n"
+        f"队伍 {emoji} {team}　身份 {identity}\n\n"
         f"{SECTION_RULE} 任务 {SECTION_RULE}\n"
-        f"{MINI_IDENTITY_TASKS[identity]}\n\n"
-        f"{CLOSING_FLOURISH}"
+        f"{MINI_IDENTITY_TASKS[identity]}\n"
+        f"{CARD_BOTTOM}"
     )
 
 
+def all_confirmed_line():
+    return f"{JELLY} 全部确认，可以开始游戏。"
+
+
 def confirmation_status_text(confirmed, needed):
-    ready = confirmed >= needed
-    lines = [
-        f"🎴 {STAR} 特殊身份确认状态\n",
-        f"已确认: {confirmed}/{needed}",
-    ]
-    if ready:
-        lines.append(f"\n{JELLY} 全部特殊身份已确认，游戏可以开始。")
-    return "\n".join(lines)
+    text = f"🎴 特殊身份确认: {confirmed}/{needed}"
+    if confirmed >= needed:
+        text += f"\n{all_confirmed_line()}"
+    return text
 
 
 def reveal_text(teams, identities):
-    lines = [f"🎭 {STAR} 身份揭晓 {STAR}\n"]
+    lines = [f"🎨 {STAR} 身份揭晓 {STAR}", ""]
     for team, player_ids in teams.items():
         emoji = TEAM_EMOJI.get(team, team)
-        lines.append(f"{emoji} {team}:")
-        for player_id in player_ids:
-            lines.append(f"{mention(player_id)}: {identities[player_id]}")
-        lines.append("")
+        entries = "　".join(f"{mention(p)}: {identities[p]}" for p in player_ids)
+        lines.append(f"{emoji} {team}　{entries}")
+    lines.append("")
     lines.append(CLOSING_FLOURISH)
     return "\n".join(lines).strip()
 
@@ -122,16 +120,16 @@ RANK_GLYPHS = {1: "✦", 2: "❀", 3: "⋆"}
 
 def leaderboard_text(board):
     if not board:
-        return "🏆 本次活动积分\n\n暂无数据"
-    lines = [f"🏆 {STAR} 本次活动积分 {STAR}\n"]
+        return "🐚 暂无数据"
+    lines = [f"🐚 {STAR} 本次活动积分 {STAR}", ""]
     for i, entry in enumerate(board, start=1):
         glyph = RANK_GLYPHS.get(i, "·")
         lines.append(
-            f"{glyph} 第 {i} 名 · {entry['username']}\n"
-            f"游戏数: {entry['games_played']}　"
-            f"总分: {entry['total_score']}　"
-            f"平均: {entry['average']:.2f}\n"
+            f"{glyph} 第 {i} 名 · {entry['username']}　"
+            f"场次 {entry['games_played']}｜总分 {entry['total_score']}｜"
+            f"均分 {entry['average']:.2f}"
         )
+    lines.append("")
     lines.append(CLOSING_FLOURISH)
     return "\n".join(lines).strip()
 
@@ -139,8 +137,8 @@ def leaderboard_text(board):
 def session_list_text(entries):
     """entries: list of (session_row, player_count), newest first."""
     if not entries:
-        return "📚 场次列表\n\n暂无场次"
-    lines = [f"📚 {STAR} 最近场次 {STAR}\n"]
+        return f"{STAR} 暂无场次"
+    lines = [f"{STAR} 最近场次 {STAR}", ""]
     for session, count in entries:
         title = session["name"] or f"Session #{session['id']}"
         status_label = "🟢 进行中" if session["status"] == "active" else "⚪ 已结束"
@@ -149,26 +147,23 @@ def session_list_text(entries):
 
 
 def session_status_text(title, player_ids):
-    lines = [f"📋 {STAR} {title} {STAR}\n", f"参与人数: {len(player_ids)}"]
+    lines = [f"🫐 {title}　参与人数: {len(player_ids)}"]
     if player_ids:
-        lines.append("")
-        lines.extend(mention(p) for p in player_ids)
+        lines.append(" ".join(mention(p) for p in player_ids))
     return "\n".join(lines)
 
 
 def mini_status_text(player_ids, capacity):
-    lines = [f"📋 {STAR} Mini 名单 {STAR}\n", f"人数: {len(player_ids)}/{capacity}"]
+    lines = [f"🫐 Mini 名单　{len(player_ids)}/{capacity}"]
     if player_ids:
-        lines.append("")
-        lines.extend(mention(p) for p in player_ids)
+        lines.append(" ".join(mention(p) for p in player_ids))
     return "\n".join(lines)
 
 
 def vote_status_text(round_no, voted, total):
-    return f"🗳️ 第 {round_no} 轮投票: {voted}/{total} 已投票"
+    return f"🫧 第 {round_no} 轮投票: {voted}/{total} 已投票"
 
 
 def tie_text(candidates):
-    lines = ["⚠️ 平票\n", "候选人:"]
-    lines.extend(mention(c) for c in candidates)
-    return "\n".join(lines)
+    names = " ".join(mention(c) for c in candidates)
+    return f"⚠️ 平票\n候选人: {names}"

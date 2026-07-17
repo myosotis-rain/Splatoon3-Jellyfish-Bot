@@ -9,8 +9,8 @@ def test_team_announcement_text_contains_all_players_and_emoji():
     teams = {"A": ["p1", "p2"], "B": ["p3", "p4"]}
     text = messages.team_announcement_text(3, teams)
     assert "Game #3" in text
-    assert "🔴 A" in text
-    assert "🔵 B" in text
+    assert "🦑 A" in text
+    assert "🐙 B" in text
     for pid in ("p1", "p2", "p3", "p4"):
         assert messages.mention(pid) in text
 
@@ -49,6 +49,15 @@ def test_mini_identity_card_text_good():
     text = messages.mini_identity_card_text("B", config.IDENTITY_GOOD)
     assert "好鱿" in text
     assert "帮助队伍获胜" in text
+
+
+def test_all_confirmed_line_uses_jelly():
+    assert messages.all_confirmed_line().startswith(messages.JELLY)
+
+
+def test_confirmation_status_text_ready_uses_all_confirmed_line():
+    text = messages.confirmation_status_text(4, 4)
+    assert messages.all_confirmed_line() in text
 
 
 def test_confirmation_status_text_not_ready():
