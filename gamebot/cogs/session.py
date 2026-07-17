@@ -98,10 +98,24 @@ class SessionCog(commands.Cog):
         if session is None:
             await ctx.send("当前没有进行中的场次。", ephemeral=True)
             return
-        players = self.db.get_session_players(session["id"])
-        names = [self.db.name_or_id(p) for p in players]
+        active_players = self.db.get_session_players(session["id"])
+        all_players = self.db.get_session_players(session["id"], active_only=False)
+        left_players = [p for p in all_players if p not in active_players]
+        left_played = [
+            p for p in left_players
+            if self.db.get_session_player_row(session["id"], p)["games_played"] > 0
+        ]
+
+        active_names = [self.db.name_or_id(p) for p in active_players]
+        left_names = [self.db.name_or_id(p) for p in left_played]
+
+        latest_game = self.db.get_latest_game(session["id"])
+        game_count = latest_game["game_number"] if latest_game else 0
+
         title = session["name"] or f"Session #{session['id']}"
-        await ctx.send(messages.session_status_text(title, names))
+        await ctx.send(
+            messages.session_status_text(title, game_count, active_names, left_names)
+        )
 
     @session.command(name="list", description="列出本服务器的所有场次（含已结束的）")
     async def list_sessions(self, ctx: commands.Context):

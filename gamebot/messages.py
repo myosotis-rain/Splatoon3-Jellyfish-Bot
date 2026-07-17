@@ -190,10 +190,15 @@ def session_list_text(entries):
     return "\n".join(lines)
 
 
-def session_status_text(title, names):
-    lines = [f"🫐 {title}　参与人数: {len(names)}"]
-    if names:
-        lines.append(" ".join(names))
+def session_status_text(title, game_count, active_names, left_names):
+    lines = [f"🫐 {title}　参与人数: {len(active_names)}　总局数: {game_count}"]
+    if active_names:
+        lines.append("")
+        lines.extend(active_names)
+    if left_names:
+        lines.append("")
+        lines.append(f"{SECTION_RULE} 已离开（曾参与计分） {SECTION_RULE}")
+        lines.extend(left_names)
     return "\n".join(lines)
 
 

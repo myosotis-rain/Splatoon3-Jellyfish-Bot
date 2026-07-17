@@ -134,16 +134,26 @@ def test_leaderboard_text_formats_average_and_rank():
 
 
 def test_session_status_text_lists_players():
-    text = messages.session_status_text("Friday Night", ["Sophia", "Alex"])
+    text = messages.session_status_text("Friday Night", 3, ["Sophia", "Alex"], [])
     assert "Friday Night" in text
     assert "参与人数: 2" in text
+    assert "总局数: 3" in text
     assert "Sophia" in text
     assert "Alex" in text
+    assert "已离开" not in text
+
+
+def test_session_status_text_shows_left_players_separately():
+    text = messages.session_status_text("Friday Night", 3, ["Sophia"], ["Bob"])
+    assert "已离开" in text
+    assert "Bob" in text
+    assert text.index("Sophia") < text.index("已离开") < text.index("Bob")
 
 
 def test_session_status_text_empty_roster():
-    text = messages.session_status_text("Friday Night", [])
+    text = messages.session_status_text("Friday Night", 0, [], [])
     assert "参与人数: 0" in text
+    assert "总局数: 0" in text
 
 
 def test_session_list_text_empty():
