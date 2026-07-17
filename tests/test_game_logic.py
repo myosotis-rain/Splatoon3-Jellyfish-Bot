@@ -98,6 +98,15 @@ def _make_game():
     return teams, identities
 
 
+def test_find_player_with_identity_returns_none_when_absent():
+    teams, identities = _make_game()
+    del identities["a2"]
+    identities["a2"] = config.IDENTITY_GOOD
+    assert game_logic.find_player_with_identity(
+        teams, identities, "A", config.IDENTITY_DUMMY
+    ) is None
+
+
 def test_find_undercover():
     teams, identities = _make_game()
     assert game_logic.find_undercover(teams, identities, "A") == "a1"

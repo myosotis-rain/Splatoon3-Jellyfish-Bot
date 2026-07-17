@@ -56,6 +56,21 @@ def loss_result_line(losing_team, winning_team):
     return f"{losing_emoji} {losing_team} 落败　{winning_emoji} {winning_team} 胜利"
 
 
+def winning_special_roles_line(winning_team, undercover_name, dummy_name):
+    emoji = TEAM_EMOJI.get(winning_team, winning_team)
+    parts = [f"{IDENTITY_EMOJI[config.IDENTITY_UNDERCOVER]} 卧底 {undercover_name}"]
+    if dummy_name:
+        parts.append(f"{IDENTITY_EMOJI[config.IDENTITY_DUMMY]} 呆呆鱿 {dummy_name}")
+    return f"{emoji} {winning_team} 特殊身份　" + "　".join(parts)
+
+
+def vote_tally_text(tally):
+    """tally: list of (name, count) tuples, most votes first."""
+    lines = ["🫧 本轮投票结果:"]
+    lines.extend(f"{name}: {count} 票" for name, count in tally)
+    return "\n".join(lines)
+
+
 def team_announcement_text(game_number, teams, label="Game"):
     lines = [f"{STAR} {label} #{game_number} {STAR}", ""]
     for team, player_ids in teams.items():

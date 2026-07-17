@@ -165,8 +165,10 @@ class MiniCog(commands.Cog):
             session=session, game=refreshed_game, teams=teams, identities=identities,
             targets=targets,
         )
+        roles_line = views.winning_roles_line(self.db, teams, identities, winning)
         message = await ctx.send(
-            f"{messages.loss_result_line(losing, winning)}\n\n可以开始讨论，讨论结束后投票。",
+            f"{messages.loss_result_line(losing, winning)}\n{roles_line}\n\n"
+            "可以开始讨论，讨论结束后投票。",
             view=view,
         )
         self.db.set_mini_vote_message_id(game["id"], message.id)
@@ -217,8 +219,10 @@ class MiniCog(commands.Cog):
             else:
                 result_line = messages.outcome_text(category)
 
+            roles_line = views.winning_roles_line(self.db, teams, identities, winning)
             await interaction.followup.send(
-                f"⚡ 管理员直接宣布结果\n{messages.loss_result_line(losing, winning)}\n\n{result_line}"
+                f"⚡ 管理员直接宣布结果\n{messages.loss_result_line(losing, winning)}\n"
+                f"{roles_line}\n\n{result_line}"
             )
 
         view = ConfirmActionView(ctx.author.id, do_override)

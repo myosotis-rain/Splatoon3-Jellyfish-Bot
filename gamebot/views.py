@@ -3,6 +3,21 @@ import discord
 from . import config, game_flow, game_logic, messages, mini_flow
 
 
+def winning_roles_line(db, teams, identities, winning_team):
+    """Shared by game.py/mini.py's result/override and LossDeclareView so
+    the winning team's special roles are announced consistently wherever
+    a game result first gets declared."""
+    undercover_id = game_logic.find_undercover(teams, identities, winning_team)
+    dummy_id = game_logic.find_player_with_identity(
+        teams, identities, winning_team, config.IDENTITY_DUMMY
+    )
+    return messages.winning_special_roles_line(
+        winning_team,
+        db.name_or_id(undercover_id),
+        db.name_or_id(dummy_id) if dummy_id else None,
+    )
+
+
 class ConfirmView(discord.ui.View):
     """DM'd alongside a special-identity card; player taps to confirm they
     understand their role. Not persisted across bot restarts (acceptable for
@@ -170,9 +185,11 @@ class LossDeclareView(discord.ui.View):
                 session=self.session, game=refreshed_game, teams=self.teams,
                 identities=self.identities, targets=targets,
             )
+            roles_line = winning_roles_line(self.db, self.teams, self.identities, winning)
             content = (
                 f"{interaction.message.content}\n\n"
-                f"{messages.loss_result_line(losing, winning)}\n\n可以开始讨论，讨论结束后投票。"
+                f"{messages.loss_result_line(losing, winning)}\n{roles_line}\n\n"
+                "可以开始讨论，讨论结束后投票。"
             )
             await interaction.response.edit_message(content=content, view=voting_view)
             self.db.set_vote_message_id(self.game_id, interaction.message.id)

@@ -86,11 +86,20 @@ def assign_mini_game_identities(teams):
     return identities
 
 
-def find_undercover(teams, identities, team):
+def find_player_with_identity(teams, identities, team, identity):
+    """Returns the player_id on `team` holding `identity`, or None if no
+    one on that team has it (e.g. Mini has no dummy at all)."""
     for player_id in teams[team]:
-        if identities[player_id] == config.IDENTITY_UNDERCOVER:
+        if identities[player_id] == identity:
             return player_id
-    raise ValueError(f"No undercover found on team {team}")
+    return None
+
+
+def find_undercover(teams, identities, team):
+    player_id = find_player_with_identity(teams, identities, team, config.IDENTITY_UNDERCOVER)
+    if player_id is None:
+        raise ValueError(f"No undercover found on team {team}")
+    return player_id
 
 
 def outcome_category(teams, identities, losing_team, eliminated_player):

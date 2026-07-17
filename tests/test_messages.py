@@ -11,6 +11,27 @@ def test_loss_result_line_shows_both_team_emoji():
     assert "🔵 B" in text
 
 
+def test_winning_special_roles_line_undercover_only():
+    text = messages.winning_special_roles_line("B", "Alex", None)
+    assert "Alex" in text
+    assert "卧底" in text
+    assert "呆呆鱿" not in text
+
+
+def test_winning_special_roles_line_with_dummy():
+    text = messages.winning_special_roles_line("B", "Alex", "Bob")
+    assert "Alex" in text
+    assert "Bob" in text
+    assert "卧底" in text
+    assert "呆呆鱿" in text
+
+
+def test_vote_tally_text_lists_each_count():
+    text = messages.vote_tally_text([("Sophia", 3), ("Alex", 1)])
+    assert "Sophia: 3 票" in text
+    assert "Alex: 1 票" in text
+
+
 def test_team_announcement_text_contains_all_players_and_emoji():
     teams = {"A": ["p1", "p2"], "B": ["p3", "p4"]}
     text = messages.team_announcement_text(3, teams)
