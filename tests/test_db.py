@@ -31,6 +31,15 @@ def test_get_username_returns_none_for_unseen_player(db):
     assert db.get_username(999) is None
 
 
+def test_name_or_id_falls_back_to_id_string(db):
+    assert db.name_or_id(999) == "999"
+
+
+def test_name_or_id_returns_username_when_known(db):
+    db.upsert_player(111, "Sophia")
+    assert db.name_or_id(111) == "Sophia"
+
+
 def test_upsert_player_always_overwrites(db):
     db.upsert_player(111, "Sophia")
     db.upsert_player(111, "CustomName")

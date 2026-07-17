@@ -166,6 +166,9 @@ class Database:
         ).fetchone()
         return row["username"] if row else None
 
+    def name_or_id(self, discord_id):
+        return self.get_username(discord_id) or str(discord_id)
+
     # -- sessions ------------------------------------------------------
 
     def get_active_session(self, server_id):

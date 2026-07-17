@@ -242,13 +242,13 @@ class GameCog(commands.Cog):
 
             lines = [f"⚡ 管理员直接宣布结果\n{messages.loss_result_line(losing, winning)}\n"]
             if eliminated:
-                lines.append(f"被抓: {messages.mention(eliminated)}\n")
+                lines.append(f"被抓: {self.db.name_or_id(eliminated)}\n")
             lines.append("本局积分:")
             for player_id, score in scores.items():
-                lines.append(f"{messages.mention(player_id)}: {score:+d}")
+                lines.append(f"{self.db.name_or_id(player_id)}: {score:+d}")
             await interaction.followup.send("\n".join(lines))
 
-        caught_line = f"\n被抓: {messages.mention(eliminated)}" if eliminated else ""
+        caught_line = f"\n被抓: {self.db.name_or_id(eliminated)}" if eliminated else ""
         view = ConfirmActionView(ctx.author.id, do_override)
         await ctx.send(
             f"⚠️ 即将直接宣布结果并跳过投票流程:\n{messages.loss_result_line(losing, winning)}"
@@ -319,14 +319,14 @@ class GameCog(commands.Cog):
                 final_round_votes=final_round_votes,
             )
             self.db.finalize_scores(session["id"], game["id"], scores)
-            lines = [f"被裁定指认: {messages.mention(eliminated)}\n", "本局积分:"]
+            lines = [f"被裁定为卧底: {self.db.name_or_id(eliminated)}\n", "本局积分:"]
             for pid, score in scores.items():
-                lines.append(f"{messages.mention(pid)}: {score:+d}")
+                lines.append(f"{self.db.name_or_id(pid)}: {score:+d}")
             await interaction.followup.send("\n".join(lines))
 
         view = ConfirmActionView(ctx.author.id, do_resolvetie)
         await ctx.send(
-            f"⚠️ 即将裁定 {messages.mention(eliminated)} 为被指认对象，直接计分。确定吗？",
+            f"⚠️ 即将裁定 {self.db.name_or_id(eliminated)} 为卧底，直接计分。确定吗？",
             view=view, ephemeral=True,
         )
 

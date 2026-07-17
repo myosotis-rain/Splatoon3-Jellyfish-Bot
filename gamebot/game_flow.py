@@ -30,9 +30,10 @@ def resolve_round1(db, game):
     db.set_game_status(game["id"], "voting_round2")
 
     if tie:
-        return messages.tie_text(candidates) + "\n\n请进行第二轮投票 (/vote)。"
+        names = [db.name_or_id(c) for c in candidates]
+        return messages.tie_text(names) + "\n\n请进行第二轮投票 (/vote)。"
     return (
-        f"最高票: {messages.mention(candidates[0])}\n\n"
+        f"最高票: {db.name_or_id(candidates[0])}\n\n"
         "30 秒申辩后，进行第二轮投票 (/vote)。"
     )
 
@@ -54,8 +55,9 @@ def resolve_runoff(db, session, game, teams, identities):
         next_round = round_no + 1
         db.set_vote_candidates(game["id"], tied)
         db.set_current_round(game["id"], next_round)
+        names = [db.name_or_id(c) for c in tied]
         return (
-            messages.tie_text(tied)
+            messages.tie_text(names)
             + f"\n\n仍然平票，开始第 {next_round} 轮投票 (/vote)。"
         )
 
@@ -70,9 +72,9 @@ def resolve_runoff(db, session, game, teams, identities):
         final_round_votes=final_round_votes,
     )
     db.finalize_scores(session["id"], game["id"], scores)
-    lines = [f"被指认: {messages.mention(eliminated)}\n", "本局积分:"]
+    lines = [f"被指认: {db.name_or_id(eliminated)}\n", "本局积分:"]
     for player_id, score in scores.items():
-        lines.append(f"{messages.mention(player_id)}: {score:+d}")
+        lines.append(f"{db.name_or_id(player_id)}: {score:+d}")
     return "\n".join(lines)
 
 

@@ -105,11 +105,11 @@ def test_leaderboard_text_formats_average_and_rank():
 
 
 def test_session_status_text_lists_players():
-    text = messages.session_status_text("Friday Night", ["p1", "p2"])
+    text = messages.session_status_text("Friday Night", ["Sophia", "Alex"])
     assert "Friday Night" in text
     assert "参与人数: 2" in text
-    assert messages.mention("p1") in text
-    assert messages.mention("p2") in text
+    assert "Sophia" in text
+    assert "Alex" in text
 
 
 def test_session_status_text_empty_roster():
@@ -136,14 +136,14 @@ def test_session_list_text_shows_status_and_counts():
 
 
 def test_mini_status_text_lists_players_and_capacity():
-    text = messages.mini_status_text(["p1", "p2"], 6)
+    text = messages.mini_status_text(["Sophia", "Alex"], 6)
     assert "2/6" in text
-    assert messages.mention("p1") in text
-    assert messages.mention("p2") in text
+    assert "Sophia" in text
+    assert "Alex" in text
 
 
 def test_tie_text_lists_candidates():
-    text = messages.tie_text(["p1", "p2"])
+    text = messages.tie_text(["Sophia", "Alex"])
     assert "平票" in text
-    assert messages.mention("p1") in text
-    assert messages.mention("p2") in text
+    assert "Sophia" in text
+    assert "Alex" in text

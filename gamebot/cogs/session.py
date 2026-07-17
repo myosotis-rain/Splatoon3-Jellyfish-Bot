@@ -84,8 +84,9 @@ class SessionCog(commands.Cog):
             await ctx.send("当前没有进行中的场次。", ephemeral=True)
             return
         players = self.db.get_session_players(session["id"])
+        names = [self.db.name_or_id(p) for p in players]
         title = session["name"] or f"Session #{session['id']}"
-        await ctx.send(messages.session_status_text(title, players))
+        await ctx.send(messages.session_status_text(title, names))
 
     @session.command(name="list", description="列出本服务器的所有场次（含已结束的）")
     async def list_sessions(self, ctx: commands.Context):

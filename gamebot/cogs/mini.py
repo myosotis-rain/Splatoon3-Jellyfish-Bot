@@ -72,7 +72,8 @@ class MiniCog(commands.Cog):
             await ctx.send(str(e), ephemeral=True)
             return
         players = self.db.get_mini_session_players(session["id"])
-        await ctx.send(messages.mini_status_text(players, config.MINI_GAME_SIZE))
+        names = [self.db.name_or_id(p) for p in players]
+        await ctx.send(messages.mini_status_text(names, config.MINI_GAME_SIZE))
 
     @mini.command(name="end", description="结束当前 Mini 名单（不创建新名单）")
     async def end(self, ctx: commands.Context):
@@ -213,7 +214,7 @@ class MiniCog(commands.Cog):
             if eliminated:
                 losing_undercover = game_logic.find_undercover(teams, identities, losing)
                 outcome = "🎉 抓到卧底了！" if eliminated == losing_undercover else "😅 卧底逃脱了！"
-                result_line = f"被抓: {messages.mention(eliminated)}\n\n{outcome}"
+                result_line = f"被抓: {self.db.name_or_id(eliminated)}\n\n{outcome}"
             else:
                 result_line = "😅 卧底未被抓到。"
 
@@ -281,11 +282,13 @@ class MiniCog(commands.Cog):
             self.db.complete_mini_game(game["id"])
             losing_undercover = game_logic.find_undercover(teams, identities, game["losing_team"])
             outcome = "🎉 抓到卧底了！" if eliminated == losing_undercover else "😅 卧底逃脱了！"
-            await interaction.followup.send(f"被裁定指认: {messages.mention(eliminated)}\n\n{outcome}")
+            await interaction.followup.send(
+                f"被裁定为卧底: {self.db.name_or_id(eliminated)}\n\n{outcome}"
+            )
 
         view = ConfirmActionView(ctx.author.id, do_resolvetie)
         await ctx.send(
-            f"⚠️ 即将裁定 {messages.mention(eliminated)} 为被指认对象，结束本局。确定吗？",
+            f"⚠️ 即将裁定 {self.db.name_or_id(eliminated)} 为卧底，结束本局。确定吗？",
             view=view, ephemeral=True,
         )
 

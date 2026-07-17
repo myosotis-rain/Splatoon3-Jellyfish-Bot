@@ -152,17 +152,17 @@ def session_list_text(entries):
     return "\n".join(lines)
 
 
-def session_status_text(title, player_ids):
-    lines = [f"🫐 {title}　参与人数: {len(player_ids)}"]
-    if player_ids:
-        lines.append(" ".join(mention(p) for p in player_ids))
+def session_status_text(title, names):
+    lines = [f"🫐 {title}　参与人数: {len(names)}"]
+    if names:
+        lines.append(" ".join(names))
     return "\n".join(lines)
 
 
-def mini_status_text(player_ids, capacity):
-    lines = [f"🫐 Mini 名单　{len(player_ids)}/{capacity}"]
-    if player_ids:
-        lines.append(" ".join(mention(p) for p in player_ids))
+def mini_status_text(names, capacity):
+    lines = [f"🫐 Mini 名单　{len(names)}/{capacity}"]
+    if names:
+        lines.append(" ".join(names))
     return "\n".join(lines)
 
 
@@ -170,6 +170,5 @@ def vote_status_text(round_no, voted, total):
     return f"🫧 第 {round_no} 轮投票: {voted}/{total} 已投票"
 
 
-def tie_text(candidates):
-    names = " ".join(mention(c) for c in candidates)
-    return f"⚠️ 平票\n候选人: {names}"
+def tie_text(candidate_names):
+    return f"⚠️ 平票\n候选人: {' '.join(candidate_names)}"

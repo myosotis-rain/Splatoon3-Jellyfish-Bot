@@ -249,7 +249,7 @@ async def cast_vote(*, db, flow, channel, guild, session, game, teams, identitie
     try:
         game_logic.validate_vote(voter_id, target_id, voters, targets)
     except game_logic.VoteError as e:
-        options = ", ".join(messages.mention(t) for t in targets) or "无"
+        options = ", ".join(db.name_or_id(t) for t in targets) or "无"
         await reply(f"⚠️ {e}\n\n可投对象: {options}", ephemeral=True)
         return
 
