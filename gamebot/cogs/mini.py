@@ -27,7 +27,7 @@ class MiniCog(commands.Cog):
     @commands.guild_only()
     async def mini(self, ctx: commands.Context):
         await ctx.send(
-            "请使用 /mini join|leave|status|start|result|closevote|resolvetie|reveal|end",
+            "请使用 /mini join|leave|status|start|result|closevote|resolvetie|cancel|reveal|end",
             ephemeral=True,
         )
 
@@ -84,10 +84,11 @@ class MiniCog(commands.Cog):
             return
 
         latest_game = self.db.get_latest_mini_game(session["id"])
-        if latest_game is not None and latest_game["status"] != "completed":
+        if latest_game is not None and latest_game["status"] not in config.TERMINAL_GAME_STATUSES:
             await ctx.send(
                 f"上一局 (Mini #{latest_game['game_number']}) 还没有结束"
-                f"（状态: {latest_game['status']}），请先用 /mini closevote 或 /mini override 结束。",
+                f"（状态: {latest_game['status']}），请先用 /mini closevote、/mini override 或 "
+                "/mini cancel 结束。",
                 ephemeral=True,
             )
             return
@@ -104,10 +105,11 @@ class MiniCog(commands.Cog):
             return
 
         latest_game = self.db.get_latest_mini_game(session["id"])
-        if latest_game is not None and latest_game["status"] != "completed":
+        if latest_game is not None and latest_game["status"] not in config.TERMINAL_GAME_STATUSES:
             await ctx.send(
                 f"上一局 (Mini #{latest_game['game_number']}) 还没有结束"
-                f"（状态: {latest_game['status']}），请先用 /mini closevote 或 /mini override 结束。",
+                f"（状态: {latest_game['status']}），请先用 /mini closevote、/mini override 或 "
+                "/mini cancel 结束。",
                 ephemeral=True,
             )
             return
@@ -191,7 +193,7 @@ class MiniCog(commands.Cog):
         except RuntimeError as e:
             await ctx.send(str(e), ephemeral=True)
             return
-        if game["status"] == "completed":
+        if game["status"] in config.TERMINAL_GAME_STATUSES:
             await ctx.send("本局已经结束，无法再次宣布结果。", ephemeral=True)
             return
 
@@ -298,6 +300,31 @@ class MiniCog(commands.Cog):
         view = ConfirmActionView(ctx.author.id, do_resolvetie)
         await ctx.send(
             f"⚠️ 即将裁定 {self.db.name_or_id(eliminated)} 为卧底，结束本局。确定吗？",
+            view=view, ephemeral=True,
+        )
+
+    @mini.command(name="cancel", description="[管理] 取消本局 Mini，不计入记录")
+    async def cancel(self, ctx: commands.Context):
+        try:
+            session = self._require_session(ctx)
+            game = self._require_game(session)
+        except RuntimeError as e:
+            await ctx.send(str(e), ephemeral=True)
+            return
+        if game["status"] in config.TERMINAL_GAME_STATUSES:
+            await ctx.send("本局已经结束。", ephemeral=True)
+            return
+
+        async def do_cancel(interaction):
+            self.db.set_mini_game_status(game["id"], "cancelled")
+            content = f"🌊 Mini #{game['game_number']} 已取消，不计入记录。"
+            message = await views.clear_vote_message(self.db, mini_flow, ctx.channel, game["id"], content)
+            if message is None:
+                await interaction.followup.send(content)
+
+        view = ConfirmActionView(ctx.author.id, do_cancel)
+        await ctx.send(
+            f"⚠️ 即将取消 Mini #{game['game_number']}，不计入记录。确定吗？",
             view=view, ephemeral=True,
         )
 

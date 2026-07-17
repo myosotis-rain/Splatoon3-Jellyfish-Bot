@@ -263,6 +263,16 @@ async def _fetch_vote_message(db, flow, channel, game_id):
     return await channel.fetch_message(int(message_id))
 
 
+async def clear_vote_message(db, flow, channel, game_id, content):
+    """Edit the tracked voting message (if any) to `content` with its
+    buttons removed. Used when a game is cancelled mid-vote, so stale
+    vote buttons can't be clicked afterward."""
+    message = await _fetch_vote_message(db, flow, channel, game_id)
+    if message is not None:
+        await message.edit(content=content, view=None)
+    return message
+
+
 async def apply_round_result(*, db, flow, channel, guild, session, game, teams,
                               identities, round_no, result):
     """After a round resolves -- whether triggered by the last vote coming
@@ -299,6 +309,13 @@ async def cast_vote(*, db, flow, channel, guild, session, game, teams, identitie
     buttons and the typed /vote command (gamebot/cogs/voting.py) so there
     is exactly one path that can mutate vote state."""
     ops = _mode_ops(flow)
+    # Re-fetch rather than trusting the passed-in game: VotingView holds a
+    # snapshot from whenever it was built, and a button click can arrive
+    # after the round advanced or the game was cancelled out from under it.
+    game = ops["get_game"](db, game["id"])
+    if game["status"] not in ("voting_round1", "voting_round2"):
+        await reply("当前不是投票阶段，可能已被取消或结算。", ephemeral=True)
+        return
     round_no, voters, targets = flow.voters_and_targets(db, teams, identities, game)
 
     try:

@@ -31,7 +31,7 @@ class GameCog(commands.Cog):
     async def game(self, ctx: commands.Context):
         await ctx.send(
             "请使用 /game start|status|confirmations|forceconfirm|result|"
-            "closevote|resolvetie|reveal",
+            "closevote|resolvetie|cancel|reveal",
             ephemeral=True,
         )
 
@@ -72,10 +72,11 @@ class GameCog(commands.Cog):
             return
 
         latest_game = self.db.get_latest_game(session["id"])
-        if latest_game is not None and latest_game["status"] != "completed":
+        if latest_game is not None and latest_game["status"] not in config.TERMINAL_GAME_STATUSES:
             await ctx.send(
                 f"上一局 (Game #{latest_game['game_number']}) 还没有结束"
-                f"（状态: {latest_game['status']}），请先用 /game closevote 或 /game override 结束。",
+                f"（状态: {latest_game['status']}），请先用 /game closevote、/game override 或 "
+                "/game cancel 结束。",
                 ephemeral=True,
             )
             return
@@ -211,7 +212,7 @@ class GameCog(commands.Cog):
         except RuntimeError as e:
             await ctx.send(str(e), ephemeral=True)
             return
-        if game["status"] == "completed":
+        if game["status"] in config.TERMINAL_GAME_STATUSES:
             await ctx.send(
                 "本局已经结束，无法再次宣布结果。如需修正积分请使用 /session adjustscore。",
                 ephemeral=True,
@@ -339,6 +340,31 @@ class GameCog(commands.Cog):
         view = ConfirmActionView(ctx.author.id, do_resolvetie)
         await ctx.send(
             f"⚠️ 即将裁定 {self.db.name_or_id(eliminated)} 为卧底，直接计分。确定吗？",
+            view=view, ephemeral=True,
+        )
+
+    @game.command(name="cancel", description="[管理] 取消本局游戏，不计分且不计入记录")
+    async def cancel(self, ctx: commands.Context):
+        try:
+            session = self._require_session(ctx)
+            game = self._require_game(session)
+        except RuntimeError as e:
+            await ctx.send(str(e), ephemeral=True)
+            return
+        if game["status"] in config.TERMINAL_GAME_STATUSES:
+            await ctx.send("本局已经结束。", ephemeral=True)
+            return
+
+        async def do_cancel(interaction):
+            self.db.set_game_status(game["id"], "cancelled")
+            content = f"🌊 Game #{game['game_number']} 已取消，不计分。"
+            message = await views.clear_vote_message(self.db, game_flow, ctx.channel, game["id"], content)
+            if message is None:
+                await interaction.followup.send(content)
+
+        view = ConfirmActionView(ctx.author.id, do_cancel)
+        await ctx.send(
+            f"⚠️ 即将取消 Game #{game['game_number']}，不计分且不计入记录。确定吗？",
             view=view, ephemeral=True,
         )
 

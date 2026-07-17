@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from .. import messages
+from .. import config, messages
 
 
 class SessionCog(commands.Cog):
@@ -18,7 +18,7 @@ class SessionCog(commands.Cog):
         if session is None:
             return None
         game = self.db.get_latest_game(session["id"])
-        if game is not None and game["status"] != "completed":
+        if game is not None and game["status"] not in config.TERMINAL_GAME_STATUSES:
             return game
         return None
 

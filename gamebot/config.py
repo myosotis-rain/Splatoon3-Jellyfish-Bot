@@ -19,3 +19,7 @@ IDENTITY_DUMMY = "呆呆鱿"
 IDENTITY_GOOD = "好鱿"
 
 IDENTITIES_NEEDING_CONFIRMATION = (IDENTITY_UNDERCOVER, IDENTITY_DUMMY)
+
+# A game in either of these statuses is done and won't block starting a
+# new one -- 'cancelled' games just never reach 'completed'.
+TERMINAL_GAME_STATUSES = ("completed", "cancelled")
