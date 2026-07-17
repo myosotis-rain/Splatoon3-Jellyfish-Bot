@@ -6,6 +6,9 @@ load_dotenv()
 
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "")
 DATABASE_PATH = os.getenv("DATABASE_PATH", "gamebot.db")
+# Render (and most PaaS hosts) set PORT themselves; the default only
+# matters for local runs, which never actually hit this port.
+PORT = int(os.getenv("PORT", 8080))
 
 TEAM_SIZE = 4
 GAME_SIZE = TEAM_SIZE * 2

@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: jellyfish-bot
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: DATABASE_PATH
+        value: gamebot.db
+
+# Notes:
+# - DISCORD_TOKEN (sync: false) must be set manually in the Render
+#   dashboard after the service is created -- it's a secret, never
+#   committed here.
+# - Free tier has no persistent disk: gamebot.db resets on every
+#   deploy/restart. To keep history across restarts, add a paid Disk,
+#   mount it (e.g. /data), and change DATABASE_PATH to /data/gamebot.db.
+# - Render's free Web Services spin down after ~15 minutes with no
+#   HTTP traffic. Pair this with an external uptime pinger (UptimeRobot,
+#   cron-job.org, etc.) hitting the deployed URL every ~10 minutes to
+#   keep the Discord bot connection alive.

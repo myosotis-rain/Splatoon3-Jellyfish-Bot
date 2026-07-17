@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 import discord
+from aiohttp import web
 from discord.ext import commands
 
 from gamebot import config
@@ -52,11 +53,30 @@ async def on_command_error(ctx, error):
     raise error
 
 
+async def start_web_server():
+    """A Discord bot never receives HTTP traffic on its own, but Render's
+    free tier only exists for Web Services, which require something to
+    bind $PORT and answer health checks. This is that something -- pair
+    the deployed service with an external uptime pinger (UptimeRobot,
+    cron-job.org, etc.) hitting it every ~10 minutes, or Render's own
+    15-minute inactivity spin-down will still kill the bot."""
+    async def health(request):
+        return web.Response(text="ok")
+
+    app = web.Application()
+    app.router.add_get("/", health)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", config.PORT)
+    await site.start()
+
+
 async def main():
     if not config.DISCORD_TOKEN:
         raise SystemExit(
             "DISCORD_TOKEN is not set. Copy .env.example to .env and fill in your bot token."
         )
+    await start_web_server()
     async with bot:
         await bot.start(config.DISCORD_TOKEN)
 
