@@ -84,6 +84,57 @@ def assign_game_identities(teams):
     return identities
 
 
+def assign_identities_partial(team_player_ids, undercover=None, dummy=None):
+    """Like assign_identities, but the undercover and/or dummy for this
+    team may already be pinned down; everyone else is randomly split
+    into whichever special roles remain, then good."""
+    if len(team_player_ids) != config.TEAM_SIZE:
+        raise ValueError(
+            f"Team requires exactly {config.TEAM_SIZE} players, got {len(team_player_ids)}"
+        )
+    if undercover is not None and undercover not in team_player_ids:
+        raise ValueError("undercover must be a member of this team")
+    if dummy is not None and dummy not in team_player_ids:
+        raise ValueError("dummy must be a member of this team")
+    if undercover is not None and undercover == dummy:
+        raise ValueError("undercover and dummy must be different players")
+
+    identities = {}
+    remaining = list(team_player_ids)
+    if undercover is not None:
+        identities[undercover] = config.IDENTITY_UNDERCOVER
+        remaining.remove(undercover)
+    if dummy is not None:
+        identities[dummy] = config.IDENTITY_DUMMY
+        remaining.remove(dummy)
+
+    random.shuffle(remaining)
+    idx = 0
+    if undercover is None:
+        identities[remaining[idx]] = config.IDENTITY_UNDERCOVER
+        idx += 1
+    if dummy is None:
+        identities[remaining[idx]] = config.IDENTITY_DUMMY
+        idx += 1
+    for player_id in remaining[idx:]:
+        identities[player_id] = config.IDENTITY_GOOD
+    return identities
+
+
+def assign_game_identities_partial(teams, picks):
+    """picks: {"A": {"undercover": id_or_None, "dummy": id_or_None}, "B": {...}}
+    -> {player_id: identity} across both teams."""
+    identities = {}
+    for team, player_ids in teams.items():
+        team_picks = picks.get(team, {})
+        identities.update(assign_identities_partial(
+            player_ids,
+            undercover=team_picks.get("undercover"),
+            dummy=team_picks.get("dummy"),
+        ))
+    return identities
+
+
 def assign_mini_identities(team_player_ids):
     """Mini (3v3) variant: 1 undercover + 2 good within one team of 3.
     No dummy — Mini has no elimination-for-points role since it isn't scored.
@@ -109,6 +160,43 @@ def assign_mini_game_identities(teams):
     identities = {}
     for team_players in teams.values():
         identities.update(assign_mini_identities(team_players))
+    return identities
+
+
+def assign_mini_identities_partial(team_player_ids, undercover=None):
+    """Like assign_mini_identities, but the undercover for this team may
+    already be pinned down; everyone else on the team is good (Mini has
+    no dummy role)."""
+    if len(team_player_ids) != config.MINI_TEAM_SIZE:
+        raise ValueError(
+            f"Mini team requires exactly {config.MINI_TEAM_SIZE} players, "
+            f"got {len(team_player_ids)}"
+        )
+    if undercover is not None and undercover not in team_player_ids:
+        raise ValueError("undercover must be a member of this team")
+
+    identities = {}
+    remaining = list(team_player_ids)
+    if undercover is not None:
+        identities[undercover] = config.IDENTITY_UNDERCOVER
+        remaining.remove(undercover)
+    else:
+        random.shuffle(remaining)
+        identities[remaining.pop(0)] = config.IDENTITY_UNDERCOVER
+    for player_id in remaining:
+        identities[player_id] = config.IDENTITY_GOOD
+    return identities
+
+
+def assign_mini_game_identities_partial(teams, picks):
+    """picks: {"A": {"undercover": id_or_None}, "B": {...}}
+    -> {player_id: identity} across both teams."""
+    identities = {}
+    for team, player_ids in teams.items():
+        team_picks = picks.get(team, {})
+        identities.update(assign_mini_identities_partial(
+            player_ids, undercover=team_picks.get("undercover")
+        ))
     return identities
 
 

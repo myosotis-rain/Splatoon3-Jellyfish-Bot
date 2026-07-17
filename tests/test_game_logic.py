@@ -67,6 +67,72 @@ def test_assign_teams_partial_raises_on_wrong_total_player_count():
         game_logic.assign_teams_partial(PLAYERS[:7], [], [])
 
 
+def test_assign_identities_partial_no_picks_is_fully_random():
+    team = ["a1", "a2", "a3", "a4"]
+    identities = game_logic.assign_identities_partial(team)
+    assert set(identities.keys()) == set(team)
+    counts = {}
+    for ident in identities.values():
+        counts[ident] = counts.get(ident, 0) + 1
+    assert counts[config.IDENTITY_UNDERCOVER] == 1
+    assert counts[config.IDENTITY_DUMMY] == 1
+    assert counts[config.IDENTITY_GOOD] == 2
+
+
+def test_assign_identities_partial_respects_undercover_pick():
+    team = ["a1", "a2", "a3", "a4"]
+    identities = game_logic.assign_identities_partial(team, undercover="a1")
+    assert identities["a1"] == config.IDENTITY_UNDERCOVER
+    assert list(identities.values()).count(config.IDENTITY_DUMMY) == 1
+    assert list(identities.values()).count(config.IDENTITY_GOOD) == 2
+
+
+def test_assign_identities_partial_respects_both_picks():
+    team = ["a1", "a2", "a3", "a4"]
+    identities = game_logic.assign_identities_partial(team, undercover="a1", dummy="a2")
+    assert identities["a1"] == config.IDENTITY_UNDERCOVER
+    assert identities["a2"] == config.IDENTITY_DUMMY
+    assert identities["a3"] == config.IDENTITY_GOOD
+    assert identities["a4"] == config.IDENTITY_GOOD
+
+
+def test_assign_identities_partial_raises_on_same_pick_for_both_roles():
+    team = ["a1", "a2", "a3", "a4"]
+    with pytest.raises(ValueError):
+        game_logic.assign_identities_partial(team, undercover="a1", dummy="a1")
+
+
+def test_assign_identities_partial_raises_on_pick_not_on_team():
+    team = ["a1", "a2", "a3", "a4"]
+    with pytest.raises(ValueError):
+        game_logic.assign_identities_partial(team, undercover="zzz")
+
+
+def test_assign_game_identities_partial_covers_both_teams():
+    teams = {"A": ["a1", "a2", "a3", "a4"], "B": ["b1", "b2", "b3", "b4"]}
+    picks = {"A": {"undercover": "a1"}, "B": {"dummy": "b2"}}
+    identities = game_logic.assign_game_identities_partial(teams, picks)
+    assert identities["a1"] == config.IDENTITY_UNDERCOVER
+    assert identities["b2"] == config.IDENTITY_DUMMY
+    assert set(identities.keys()) == {"a1", "a2", "a3", "a4", "b1", "b2", "b3", "b4"}
+
+
+def test_assign_mini_identities_partial_respects_pick():
+    team = ["a1", "a2", "a3"]
+    identities = game_logic.assign_mini_identities_partial(team, undercover="a2")
+    assert identities["a2"] == config.IDENTITY_UNDERCOVER
+    assert identities["a1"] == config.IDENTITY_GOOD
+    assert identities["a3"] == config.IDENTITY_GOOD
+
+
+def test_assign_mini_game_identities_partial_covers_both_teams():
+    teams = {"A": ["a1", "a2", "a3"], "B": ["b1", "b2", "b3"]}
+    picks = {"A": {"undercover": "a1"}}
+    identities = game_logic.assign_mini_game_identities_partial(teams, picks)
+    assert identities["a1"] == config.IDENTITY_UNDERCOVER
+    assert set(identities.keys()) == {"a1", "a2", "a3", "b1", "b2", "b3"}
+
+
 def test_assign_mini_identities_distribution():
     team = [f"p{i}" for i in range(1, 4)]
     identities = game_logic.assign_mini_identities(team)

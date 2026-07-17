@@ -88,6 +88,75 @@ class ManualTeamSelectView(discord.ui.View):
         await self.on_submit(interaction, teams)
 
 
+class IdentitySelectView(discord.ui.View):
+    """Step 2 of /game assign or /mini assign, shown once teams are
+    already finalized: optionally pin down each team's undercover (and
+    dummy, ranked only) from within that team's now-fixed roster.
+    Anything left unpicked is randomly assigned from the remaining
+    roles (game_logic.assign_game_identities_partial /
+    assign_mini_game_identities_partial), so leaving every dropdown
+    empty is fully random, same as today's default.
+
+    Discord limits a View to 5 action rows and a select menu always
+    takes a full row, so this is exactly at the ceiling with dummy
+    selects included (2 teams x 2 roles = 4 selects + 1 confirm
+    button); without dummy (Mini) it's 2 selects + 1 button."""
+
+    def __init__(self, *, invoker_id, teams, names, include_dummy, on_submit):
+        super().__init__(timeout=180)
+        self.invoker_id = invoker_id
+        self.teams = teams
+        self.include_dummy = include_dummy
+        self.on_submit = on_submit
+        self.picks = {team: {"undercover": None, "dummy": None} for team in teams}
+
+        for team, player_ids in teams.items():
+            emoji = messages.TEAM_EMOJI.get(team, team)
+            options = [
+                discord.SelectOption(label=names.get(p, p)[:100], value=p) for p in player_ids
+            ]
+
+            undercover_select = discord.ui.Select(
+                placeholder=f"（可选）指定 {emoji} {team} 队的卧底", min_values=0, max_values=1,
+                options=options,
+            )
+            undercover_select.callback = self._make_callback(team, "undercover", undercover_select)
+            self.add_item(undercover_select)
+
+            if include_dummy:
+                dummy_select = discord.ui.Select(
+                    placeholder=f"（可选）指定 {emoji} {team} 队的呆呆鱿", min_values=0, max_values=1,
+                    options=options,
+                )
+                dummy_select.callback = self._make_callback(team, "dummy", dummy_select)
+                self.add_item(dummy_select)
+
+        confirm_button = discord.ui.Button(label="✦ 确认身份", style=discord.ButtonStyle.success)
+        confirm_button.callback = self._on_confirm
+        self.add_item(confirm_button)
+
+    def _make_callback(self, team, role, select):
+        async def callback(interaction):
+            if interaction.user.id != self.invoker_id:
+                await interaction.response.send_message("只有发起者可以选择。", ephemeral=True)
+                return
+            self.picks[team][role] = select.values[0] if select.values else None
+            await interaction.response.defer()
+        return callback
+
+    async def _on_confirm(self, interaction):
+        if interaction.user.id != self.invoker_id:
+            await interaction.response.send_message("只有发起者可以确认。", ephemeral=True)
+            return
+        for team, picks in self.picks.items():
+            if picks["undercover"] and picks["dummy"] and picks["undercover"] == picks["dummy"]:
+                await interaction.response.send_message(
+                    f"⚠️ {team} 队的卧底和呆呆鱿不能是同一人，请重新选择。", ephemeral=True
+                )
+                return
+        await self.on_submit(interaction, self.picks)
+
+
 class ConfirmView(discord.ui.View):
     """DM'd alongside a special-identity card; player taps to confirm they
     understand their role. Not persisted across bot restarts (acceptable for

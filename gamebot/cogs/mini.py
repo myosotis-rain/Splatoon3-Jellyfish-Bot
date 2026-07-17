@@ -3,7 +3,13 @@ from discord import app_commands
 from discord.ext import commands
 
 from .. import config, game_logic, messages, mini_flow, views
-from ..views import ConfirmActionView, IdentityRevealView, ManualTeamSelectView, VotingView
+from ..views import (
+    ConfirmActionView,
+    IdentityRevealView,
+    IdentitySelectView,
+    ManualTeamSelectView,
+    VotingView,
+)
 
 
 class MiniCog(commands.Cog):
@@ -137,8 +143,9 @@ class MiniCog(commands.Cog):
             )
         return (session, players), None
 
-    async def _launch_game(self, session, teams, reply):
-        identities = game_logic.assign_mini_game_identities(teams)
+    async def _launch_game(self, session, teams, reply, identities=None):
+        if identities is None:
+            identities = game_logic.assign_mini_game_identities(teams)
         game_id, game_number = self.db.create_mini_game(session["id"])
         self.db.save_mini_team_assignment(game_id, teams, identities)
 
@@ -170,16 +177,28 @@ class MiniCog(commands.Cog):
         session, players = checked
         names = {p: self.db.name_or_id(p) for p in players}
 
-        async def on_submit(interaction, teams):
-            await interaction.response.defer()
-            await self._launch_game(
-                session, teams,
-                lambda content, view: interaction.followup.send(content, view=view),
+        async def on_teams_submit(interaction, teams):
+            async def on_identity_submit(identity_interaction, picks):
+                identities = game_logic.assign_mini_game_identities_partial(teams, picks)
+                await identity_interaction.response.defer()
+                await self._launch_game(
+                    session, teams,
+                    lambda content, view: identity_interaction.followup.send(content, view=view),
+                    identities=identities,
+                )
+
+            identity_view = IdentitySelectView(
+                invoker_id=ctx.author.id, teams=teams, names=names,
+                include_dummy=False, on_submit=on_identity_submit,
+            )
+            await interaction.response.edit_message(
+                content="可选：指定各队的卧底人选，其余身份随机分配（全部不选则完全随机）。",
+                view=identity_view,
             )
 
         view = ManualTeamSelectView(
             invoker_id=ctx.author.id, players=players, names=names,
-            team_size=config.MINI_TEAM_SIZE, on_submit=on_submit,
+            team_size=config.MINI_TEAM_SIZE, on_submit=on_teams_submit,
         )
         await ctx.send(
             "可选：指定特定人选到 🔴 A 队和/或 🔵 B 队，其余人自动随机分配到两队"
