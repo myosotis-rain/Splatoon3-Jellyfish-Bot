@@ -77,8 +77,20 @@ async def main():
             "DISCORD_TOKEN is not set. Copy .env.example to .env and fill in your bot token."
         )
     await start_web_server()
-    async with bot:
-        await bot.start(config.DISCORD_TOKEN)
+    try:
+        async with bot:
+            await bot.start(config.DISCORD_TOKEN)
+    except discord.HTTPException as e:
+        if e.status == 429:
+            # A hard block on the login call itself (not a normal
+            # per-route rate limit discord.py already retries on its
+            # own) -- e.g. from restarting with this token too many
+            # times in a short window. Back off before letting the
+            # process exit, so a platform-level restart (Render, etc.)
+            # doesn't immediately retry into the same block.
+            logging.error("Login rate-limited by Discord (429); waiting 60s before exiting: %s", e)
+            await asyncio.sleep(60)
+        raise
 
 
 if __name__ == "__main__":
