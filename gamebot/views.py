@@ -18,6 +18,40 @@ def winning_roles_line(db, teams, identities, winning_team):
     )
 
 
+class ManualTeamSelectView(discord.ui.View):
+    """Ephemeral dropdown shown to the host running /game startmanual or
+    /mini startmanual. Populated with only the current roster (never the
+    whole server), so there's nothing to search -- and Discord enforces
+    min_values == max_values == team_size, so submitting an uneven split
+    isn't possible in the first place."""
+
+    def __init__(self, *, invoker_id, players, names, team_size, on_submit):
+        super().__init__(timeout=180)
+        self.invoker_id = invoker_id
+        self.players = players
+        self.on_submit = on_submit
+
+        options = [
+            discord.SelectOption(label=names.get(p, p)[:100], value=p) for p in players
+        ]
+        select = discord.ui.Select(
+            placeholder=f"选择 {team_size} 人加入 🔴 A 队",
+            min_values=team_size, max_values=team_size, options=options,
+        )
+        select.callback = self._make_callback(select)
+        self.add_item(select)
+
+    def _make_callback(self, select):
+        async def callback(interaction):
+            if interaction.user.id != self.invoker_id:
+                await interaction.response.send_message("只有发起者可以选择。", ephemeral=True)
+                return
+            team_a = list(select.values)
+            team_b = [p for p in self.players if p not in team_a]
+            await self.on_submit(interaction, {"A": team_a, "B": team_b})
+        return callback
+
+
 class ConfirmView(discord.ui.View):
     """DM'd alongside a special-identity card; player taps to confirm they
     understand their role. Not persisted across bot restarts (acceptable for

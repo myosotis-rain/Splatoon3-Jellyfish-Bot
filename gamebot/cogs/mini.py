@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from .. import config, game_logic, messages, mini_flow, views
-from ..views import ConfirmActionView, IdentityRevealView, VotingView
+from ..views import ConfirmActionView, IdentityRevealView, ManualTeamSelectView, VotingView
 
 
 class MiniCog(commands.Cog):
@@ -27,7 +27,8 @@ class MiniCog(commands.Cog):
     @commands.guild_only()
     async def mini(self, ctx: commands.Context):
         await ctx.send(
-            "请使用 /mini join|leave|status|start|result|closevote|resolvetie|cancel|reveal|end",
+            "请使用 /mini join|leave|status|start|startmanual|result|"
+            "closevote|resolvetie|cancel|reveal|end",
             ephemeral=True,
         )
 
@@ -96,36 +97,33 @@ class MiniCog(commands.Cog):
         self.db.close_mini_session(ctx.guild.id)
         await ctx.send(f"{messages.JELLY} 已结束当前 Mini 名单。再次 /mini join 会开启新的名单。")
 
-    @mini.command(name="start", description="开始新的一局 Mini 3v3")
-    async def start(self, ctx: commands.Context):
+    def _check_can_start(self, ctx):
+        """Shared by start/startmanual: active session, previous game
+        (if any) is done, and the roster is exactly MINI_GAME_SIZE.
+        Returns (session, players) on success, or sends the error and
+        returns None."""
         try:
             session = self._require_session(ctx)
         except RuntimeError as e:
-            await ctx.send(str(e), ephemeral=True)
-            return
+            return None, str(e)
 
         latest_game = self.db.get_latest_mini_game(session["id"])
         if latest_game is not None and latest_game["status"] not in config.TERMINAL_GAME_STATUSES:
-            await ctx.send(
+            return None, (
                 f"上一局 (Mini #{latest_game['game_number']}) 还没有结束"
                 f"（状态: {latest_game['status']}），请先用 /mini closevote、/mini override 或 "
-                "/mini cancel 结束。",
-                ephemeral=True,
+                "/mini cancel 结束。"
             )
-            return
 
         players = self.db.get_mini_session_players(session["id"])
         if len(players) != config.MINI_GAME_SIZE:
-            await ctx.send(
+            return None, (
                 f"Mini 需要恰好 {config.MINI_GAME_SIZE} 名玩家才能开始，"
-                f"目前有 {len(players)} 人。",
-                ephemeral=True,
+                f"目前有 {len(players)} 人。"
             )
-            return
+        return (session, players), None
 
-        await ctx.defer()
-
-        teams = game_logic.assign_teams(players, team_size=config.MINI_TEAM_SIZE)
+    async def _launch_game(self, session, teams, reply):
         identities = game_logic.assign_mini_game_identities(teams)
         game_id, game_number = self.db.create_mini_game(session["id"])
         self.db.save_mini_team_assignment(game_id, teams, identities)
@@ -134,8 +132,44 @@ class MiniCog(commands.Cog):
             self.db, game_id, teams, identities,
             track_confirmation=False, card_text_fn=messages.mini_identity_card_text,
         )
+        await reply(messages.team_announcement_text(game_number, teams, label="Mini"), view)
+
+    @mini.command(name="start", description="开始新的一局 Mini 3v3（随机分队）")
+    async def start(self, ctx: commands.Context):
+        checked, error = self._check_can_start(ctx)
+        if error:
+            await ctx.send(error, ephemeral=True)
+            return
+        session, players = checked
+
+        await ctx.defer()
+        teams = game_logic.assign_teams(players, team_size=config.MINI_TEAM_SIZE)
+        await self._launch_game(session, teams, lambda content, view: ctx.send(content, view=view))
+
+    @mini.command(name="startmanual", description="手动指定队伍开始新的一局 Mini 3v3")
+    async def startmanual(self, ctx: commands.Context):
+        checked, error = self._check_can_start(ctx)
+        if error:
+            await ctx.send(error, ephemeral=True)
+            return
+        session, players = checked
+        names = {p: self.db.name_or_id(p) for p in players}
+
+        async def on_submit(interaction, teams):
+            await interaction.response.defer()
+            await self._launch_game(
+                session, teams,
+                lambda content, view: interaction.followup.send(content, view=view),
+            )
+
+        view = ManualTeamSelectView(
+            invoker_id=ctx.author.id, players=players, names=names,
+            team_size=config.MINI_TEAM_SIZE, on_submit=on_submit,
+        )
         await ctx.send(
-            messages.team_announcement_text(game_number, teams, label="Mini"), view=view
+            f"请选择 {config.MINI_TEAM_SIZE} 人加入 🔴 A 队，"
+            f"剩下 {config.MINI_TEAM_SIZE} 人自动加入 🔵 B 队。",
+            view=view, ephemeral=True,
         )
 
     @mini.command(name="result", description="记录输方队伍并开始投票")

@@ -6,7 +6,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from .. import config, game_flow, game_logic, messages, views
-from ..views import ConfirmActionView, IdentityRevealView, VotingView
+from ..views import ConfirmActionView, IdentityRevealView, ManualTeamSelectView, VotingView
 
 
 class GameCog(commands.Cog):
@@ -30,7 +30,7 @@ class GameCog(commands.Cog):
     @commands.guild_only()
     async def game(self, ctx: commands.Context):
         await ctx.send(
-            "请使用 /game start|status|confirmations|forceconfirm|result|"
+            "请使用 /game start|startmanual|status|confirmations|forceconfirm|result|"
             "closevote|resolvetie|cancel|reveal",
             ephemeral=True,
         )
@@ -63,36 +63,35 @@ class GameCog(commands.Cog):
             view=view, ephemeral=True,
         )
 
-    @game.command(name="start", description="开始新的一局游戏")
-    async def start(self, ctx: commands.Context):
+    def _check_can_start(self, ctx):
+        """Shared by start/startmanual: active session, previous game
+        (if any) is done, and the roster is exactly GAME_SIZE. Returns
+        (session, players) on success, or sends the error and returns None."""
         try:
             session = self._require_session(ctx)
         except RuntimeError as e:
-            await ctx.send(str(e), ephemeral=True)
-            return
+            return None, str(e)
 
         latest_game = self.db.get_latest_game(session["id"])
         if latest_game is not None and latest_game["status"] not in config.TERMINAL_GAME_STATUSES:
-            await ctx.send(
+            return None, (
                 f"上一局 (Game #{latest_game['game_number']}) 还没有结束"
                 f"（状态: {latest_game['status']}），请先用 /game closevote、/game override 或 "
-                "/game cancel 结束。",
-                ephemeral=True,
+                "/game cancel 结束。"
             )
-            return
 
         players = self.db.get_session_players(session["id"])
         if len(players) != config.GAME_SIZE:
-            await ctx.send(
+            return None, (
                 f"当前场次需要恰好 {config.GAME_SIZE} 名玩家才能开始游戏，"
-                f"目前有 {len(players)} 人。",
-                ephemeral=True,
+                f"目前有 {len(players)} 人。"
             )
-            return
+        return (session, players), None
 
-        await ctx.defer()
-
-        teams = game_logic.assign_teams(players)
+    async def _launch_game(self, session, teams, reply):
+        """reply(content, view): however the caller wants to deliver the
+        team announcement -- ctx.send for /game start, an interaction
+        followup for /game startmanual's dropdown submission."""
         identities = game_logic.assign_game_identities(teams)
         game_id, game_number = self.db.create_game(session["id"])
         self.db.save_team_assignment(game_id, teams, identities)
@@ -103,7 +102,44 @@ class GameCog(commands.Cog):
             track_confirmation=True, card_text_fn=messages.identity_card_text,
             session=session,
         )
-        await ctx.send(messages.team_announcement_text(game_number, teams), view=view)
+        await reply(messages.team_announcement_text(game_number, teams), view)
+
+    @game.command(name="start", description="开始新的一局游戏（随机分队）")
+    async def start(self, ctx: commands.Context):
+        checked, error = self._check_can_start(ctx)
+        if error:
+            await ctx.send(error, ephemeral=True)
+            return
+        session, players = checked
+
+        await ctx.defer()
+        teams = game_logic.assign_teams(players)
+        await self._launch_game(session, teams, lambda content, view: ctx.send(content, view=view))
+
+    @game.command(name="startmanual", description="手动指定队伍开始新的一局游戏")
+    async def startmanual(self, ctx: commands.Context):
+        checked, error = self._check_can_start(ctx)
+        if error:
+            await ctx.send(error, ephemeral=True)
+            return
+        session, players = checked
+        names = {p: self.db.name_or_id(p) for p in players}
+
+        async def on_submit(interaction, teams):
+            await interaction.response.defer()
+            await self._launch_game(
+                session, teams,
+                lambda content, view: interaction.followup.send(content, view=view),
+            )
+
+        view = ManualTeamSelectView(
+            invoker_id=ctx.author.id, players=players, names=names,
+            team_size=config.TEAM_SIZE, on_submit=on_submit,
+        )
+        await ctx.send(
+            f"请选择 {config.TEAM_SIZE} 人加入 🔴 A 队，剩下 {config.TEAM_SIZE} 人自动加入 🔵 B 队。",
+            view=view, ephemeral=True,
+        )
 
     @game.command(name="status", description="查看当前游戏状态")
     async def status(self, ctx: commands.Context):
