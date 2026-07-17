@@ -59,6 +59,21 @@ class SessionCog(commands.Cog):
             f"{messages.JELLY} {ctx.author.display_name} 已加入本次活动\n\n当前参与人数:\n{count}"
         )
 
+    @session.command(name="add", description="[管理] 将某玩家加入当前场次")
+    @app_commands.describe(member="要加入的玩家")
+    async def add(self, ctx: commands.Context, member: discord.Member):
+        session = self.db.get_active_session(ctx.guild.id)
+        if session is None:
+            await ctx.send(
+                "当前没有进行中的场次，请先使用 /session start 创建。", ephemeral=True
+            )
+            return
+        self.db.join_session(session["id"], member.id, member.display_name)
+        count = len(self.db.get_session_players(session["id"]))
+        await ctx.send(
+            f"{messages.JELLY} 已将 {member.display_name} 加入本次活动\n\n当前参与人数:\n{count}"
+        )
+
     @session.command(name="leave", description="离开当前场次（保留历史积分）")
     async def leave(self, ctx: commands.Context):
         session = self.db.get_active_session(ctx.guild.id)

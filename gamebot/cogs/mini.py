@@ -45,6 +45,20 @@ class MiniCog(commands.Cog):
             f"当前人数: {count}/{config.MINI_GAME_SIZE}"
         )
 
+    @mini.command(name="add", description="[管理] 将某玩家加入 Mini 名单")
+    @app_commands.describe(member="要加入的玩家")
+    async def add(self, ctx: commands.Context, member: discord.Member):
+        session = self.db.get_active_mini_session(ctx.guild.id)
+        if session is None:
+            session_id = self.db.create_mini_session(ctx.guild.id, ctx.channel.id)
+            session = self.db.get_mini_session(session_id)
+        self.db.join_mini_session(session["id"], member.id, member.display_name)
+        count = len(self.db.get_mini_session_players(session["id"]))
+        await ctx.send(
+            f"{messages.JELLY} 已将 {member.display_name} 加入 Mini 名单\n\n"
+            f"当前人数: {count}/{config.MINI_GAME_SIZE}"
+        )
+
     @mini.command(name="leave", description="离开 Mini 名单")
     async def leave(self, ctx: commands.Context):
         try:
