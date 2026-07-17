@@ -27,7 +27,16 @@ class JellyfishBot(commands.Bot):
     async def setup_hook(self):
         for extension in EXTENSIONS:
             await self.load_extension(extension)
-        await self.tree.sync()
+        if config.GUILD_ID:
+            # Guild-scoped sync propagates in seconds; the global sync
+            # below can take Discord up to an hour to show new/changed
+            # commands to clients. Single-server bot, so this is the
+            # faster path whenever GUILD_ID is set.
+            guild = discord.Object(id=int(config.GUILD_ID))
+            self.tree.copy_global_to(guild=guild)
+            await self.tree.sync(guild=guild)
+        else:
+            await self.tree.sync()
 
     async def close(self):
         self.db.close()
