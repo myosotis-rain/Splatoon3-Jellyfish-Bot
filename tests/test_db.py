@@ -82,6 +82,20 @@ def test_create_game_increments_game_number(db):
     assert second_number == 2
 
 
+def test_vote_message_id_round_trip(db):
+    game_id, _ = db.create_game(db.create_session("server1", "chan1"))
+    assert db.get_vote_message_id(game_id) is None
+    db.set_vote_message_id(game_id, 999)
+    assert db.get_vote_message_id(game_id) == "999"
+
+
+def test_mini_vote_message_id_round_trip(db):
+    game_id, _ = db.create_mini_game(db.create_mini_session("server1", "chan1"))
+    assert db.get_mini_vote_message_id(game_id) is None
+    db.set_mini_vote_message_id(game_id, 888)
+    assert db.get_mini_vote_message_id(game_id) == "888"
+
+
 def test_save_team_assignment_marks_special_identities_unconfirmed(db):
     game_id, _ = db.create_game(db.create_session("server1", "chan1"))
     teams = {"A": [1, 2, 3, 4], "B": [5, 6, 7, 8]}

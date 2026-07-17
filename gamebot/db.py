@@ -128,7 +128,14 @@ class Database:
 
     def init_schema(self):
         self.conn.executescript(SCHEMA)
+        self._migrate()
         self.conn.commit()
+
+    def _migrate(self):
+        for table in ("games", "mini_games"):
+            cols = {row["name"] for row in self.conn.execute(f"PRAGMA table_info({table})")}
+            if "vote_message_id" not in cols:
+                self.conn.execute(f"ALTER TABLE {table} ADD COLUMN vote_message_id TEXT")
 
     def close(self):
         self.conn.close()
@@ -416,6 +423,19 @@ class Database:
         )
         self.conn.commit()
 
+    def set_vote_message_id(self, game_id, message_id):
+        self.conn.execute(
+            "UPDATE games SET vote_message_id = ? WHERE id = ?",
+            (str(message_id), game_id),
+        )
+        self.conn.commit()
+
+    def get_vote_message_id(self, game_id):
+        row = self.conn.execute(
+            "SELECT vote_message_id FROM games WHERE id = ?", (game_id,)
+        ).fetchone()
+        return row["vote_message_id"] if row else None
+
     # -- scoring -------------------------------------------------------------
 
     def finalize_scores(self, session_id, game_id, scores):
@@ -620,6 +640,19 @@ class Database:
             (player_id, game_id),
         )
         self.conn.commit()
+
+    def set_mini_vote_message_id(self, game_id, message_id):
+        self.conn.execute(
+            "UPDATE mini_games SET vote_message_id = ? WHERE id = ?",
+            (str(message_id), game_id),
+        )
+        self.conn.commit()
+
+    def get_mini_vote_message_id(self, game_id):
+        row = self.conn.execute(
+            "SELECT vote_message_id FROM mini_games WHERE id = ?", (game_id,)
+        ).fetchone()
+        return row["vote_message_id"] if row else None
 
     def complete_mini_game(self, game_id):
         self.conn.execute(
