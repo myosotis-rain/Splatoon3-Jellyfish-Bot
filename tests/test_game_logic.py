@@ -28,6 +28,45 @@ def test_assign_teams_mini_size():
     assert set(teams["A"]) | set(teams["B"]) == set(mini_players)
 
 
+def test_assign_teams_partial_no_picks_is_fully_random():
+    teams = game_logic.assign_teams_partial(PLAYERS, [], [])
+    assert len(teams["A"]) == config.TEAM_SIZE
+    assert len(teams["B"]) == config.TEAM_SIZE
+    assert set(teams["A"]) | set(teams["B"]) == set(PLAYERS)
+
+
+def test_assign_teams_partial_respects_specific_picks():
+    teams = game_logic.assign_teams_partial(PLAYERS, ["p1"], ["p2", "p3"])
+    assert "p1" in teams["A"]
+    assert "p2" in teams["B"]
+    assert "p3" in teams["B"]
+    assert len(teams["A"]) == config.TEAM_SIZE
+    assert len(teams["B"]) == config.TEAM_SIZE
+    assert set(teams["A"]) | set(teams["B"]) == set(PLAYERS)
+    assert set(teams["A"]) & set(teams["B"]) == set()
+
+
+def test_assign_teams_partial_all_picked_is_fully_manual():
+    teams = game_logic.assign_teams_partial(PLAYERS, PLAYERS[:4], PLAYERS[4:])
+    assert teams["A"] == PLAYERS[:4]
+    assert teams["B"] == PLAYERS[4:]
+
+
+def test_assign_teams_partial_raises_on_overlap():
+    with pytest.raises(ValueError):
+        game_logic.assign_teams_partial(PLAYERS, ["p1"], ["p1"])
+
+
+def test_assign_teams_partial_raises_on_oversized_team():
+    with pytest.raises(ValueError):
+        game_logic.assign_teams_partial(PLAYERS, PLAYERS[:5], [])
+
+
+def test_assign_teams_partial_raises_on_wrong_total_player_count():
+    with pytest.raises(ValueError):
+        game_logic.assign_teams_partial(PLAYERS[:7], [], [])
+
+
 def test_assign_mini_identities_distribution():
     team = [f"p{i}" for i in range(1, 4)]
     identities = game_logic.assign_mini_identities(team)

@@ -19,37 +19,71 @@ def winning_roles_line(db, teams, identities, winning_team):
 
 
 class ManualTeamSelectView(discord.ui.View):
-    """Ephemeral dropdown shown to the host running /game assign or
-    /mini assign. Populated with only the current roster (never the
-    whole server), so there's nothing to search -- and Discord enforces
-    min_values == max_values == team_size, so submitting an uneven split
-    isn't possible in the first place."""
+    """Ephemeral UI shown to the host running /game assign or /mini
+    assign. Two independent dropdowns -- pin down 0 to team_size
+    specific players per team -- populated with only the current roster
+    (never the whole server), plus a confirm button. Anyone left
+    unpicked in either dropdown is randomly split to fill both teams to
+    team_size (game_logic.assign_teams_partial), so leaving both empty
+    is equivalent to a fully random /game start, and filling both
+    completely is equivalent to the old fully-manual assignment."""
 
     def __init__(self, *, invoker_id, players, names, team_size, on_submit):
         super().__init__(timeout=180)
         self.invoker_id = invoker_id
         self.players = players
+        self.team_size = team_size
         self.on_submit = on_submit
+        self.picked_a = []
+        self.picked_b = []
 
-        options = [
-            discord.SelectOption(label=names.get(p, p)[:100], value=p) for p in players
-        ]
-        select = discord.ui.Select(
-            placeholder=f"选择 {team_size} 人加入 🔴 A 队",
-            min_values=team_size, max_values=team_size, options=options,
+        def make_options():
+            return [discord.SelectOption(label=names.get(p, p)[:100], value=p) for p in players]
+
+        self.select_a = discord.ui.Select(
+            placeholder=f"（可选）指定最多 {team_size} 人加入 🔴 A 队",
+            min_values=0, max_values=team_size, options=make_options(),
         )
-        select.callback = self._make_callback(select)
-        self.add_item(select)
+        self.select_a.callback = self._make_select_callback("A", self.select_a)
+        self.add_item(self.select_a)
 
-    def _make_callback(self, select):
+        self.select_b = discord.ui.Select(
+            placeholder=f"（可选）指定最多 {team_size} 人加入 🔵 B 队",
+            min_values=0, max_values=team_size, options=make_options(),
+        )
+        self.select_b.callback = self._make_select_callback("B", self.select_b)
+        self.add_item(self.select_b)
+
+        confirm_button = discord.ui.Button(label="✦ 确认分队", style=discord.ButtonStyle.success)
+        confirm_button.callback = self._on_confirm
+        self.add_item(confirm_button)
+
+    def _make_select_callback(self, which, select):
         async def callback(interaction):
             if interaction.user.id != self.invoker_id:
                 await interaction.response.send_message("只有发起者可以选择。", ephemeral=True)
                 return
-            team_a = list(select.values)
-            team_b = [p for p in self.players if p not in team_a]
-            await self.on_submit(interaction, {"A": team_a, "B": team_b})
+            if which == "A":
+                self.picked_a = list(select.values)
+            else:
+                self.picked_b = list(select.values)
+            await interaction.response.defer()
         return callback
+
+    async def _on_confirm(self, interaction):
+        if interaction.user.id != self.invoker_id:
+            await interaction.response.send_message("只有发起者可以确认。", ephemeral=True)
+            return
+        overlap = set(self.picked_a) & set(self.picked_b)
+        if overlap:
+            await interaction.response.send_message(
+                f"⚠️ 不能同时指定到两队: {', '.join(overlap)}，请重新选择。", ephemeral=True
+            )
+            return
+        teams = game_logic.assign_teams_partial(
+            self.players, self.picked_a, self.picked_b, team_size=self.team_size
+        )
+        await self.on_submit(interaction, teams)
 
 
 class ConfirmView(discord.ui.View):

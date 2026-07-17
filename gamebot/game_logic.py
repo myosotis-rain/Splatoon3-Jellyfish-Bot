@@ -31,6 +31,32 @@ def assign_teams(player_ids, team_size=config.TEAM_SIZE):
     }
 
 
+def assign_teams_partial(player_ids, picked_a, picked_b, team_size=config.TEAM_SIZE):
+    """Complete a team split where a host has already pinned down some
+    players to specific teams (possibly none, possibly all). Everyone
+    else in player_ids is randomly split to fill each team up to
+    team_size. Returns {"A": [ids], "B": [ids]}."""
+    game_size = team_size * 2
+    if len(player_ids) != game_size:
+        raise ValueError(
+            f"Game requires exactly {game_size} players, got {len(player_ids)}"
+        )
+    picked_a = list(picked_a)
+    picked_b = list(picked_b)
+    if set(picked_a) & set(picked_b):
+        raise ValueError("A player cannot be assigned to both teams")
+    if len(picked_a) > team_size or len(picked_b) > team_size:
+        raise ValueError(f"Cannot assign more than {team_size} players to one team")
+
+    remaining = [p for p in player_ids if p not in picked_a and p not in picked_b]
+    random.shuffle(remaining)
+    need_a = team_size - len(picked_a)
+    return {
+        config.TEAMS[0]: picked_a + remaining[:need_a],
+        config.TEAMS[1]: picked_b + remaining[need_a:],
+    }
+
+
 def assign_identities(team_player_ids):
     """Randomly assign 1 undercover, 1 dummy, 2 good within one team of 4.
 

@@ -137,7 +137,8 @@ class GameCog(commands.Cog):
             team_size=config.TEAM_SIZE, on_submit=on_submit,
         )
         await ctx.send(
-            f"请选择 {config.TEAM_SIZE} 人加入 🔴 A 队，剩下 {config.TEAM_SIZE} 人自动加入 🔵 B 队。",
+            "可选：指定特定人选到 🔴 A 队和/或 🔵 B 队，其余人自动随机分配到两队"
+            "（全部不选则完全随机）。",
             view=view, ephemeral=True,
         )
 
