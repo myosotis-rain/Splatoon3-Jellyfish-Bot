@@ -7,16 +7,16 @@ def test_mention_format():
 
 def test_loss_result_line_shows_both_team_emoji():
     text = messages.loss_result_line("A", "B")
-    assert "🦑 A" in text
-    assert "🐙 B" in text
+    assert "🔴 A" in text
+    assert "🔵 B" in text
 
 
 def test_team_announcement_text_contains_all_players_and_emoji():
     teams = {"A": ["p1", "p2"], "B": ["p3", "p4"]}
     text = messages.team_announcement_text(3, teams)
     assert "Game #3" in text
-    assert "🦑 A" in text
-    assert "🐙 B" in text
+    assert "🔴 A" in text
+    assert "🔵 B" in text
     for pid in ("p1", "p2", "p3", "p4"):
         assert messages.mention(pid) in text
 

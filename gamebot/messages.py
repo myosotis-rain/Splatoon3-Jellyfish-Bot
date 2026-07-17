@@ -4,9 +4,7 @@ formatting can be unit tested without a live connection.
 
 from . import config
 
-# Squid (Inkling) vs octopus (Octoling) -- Splatoon's own team split, standing
-# in for the plain red/blue dots this used to be.
-TEAM_EMOJI = {"A": "🦑", "B": "🐙"}
+TEAM_EMOJI = {"A": "🔴", "B": "🔵"}
 
 # Decorative glyphs used to dress up bot output. JELLY replaces the plain
 # checkmark everywhere -- it's the one deliberate emoji exception, tying
@@ -70,7 +68,8 @@ def identity_card_text(team, identity):
         f"{CARD_TOP}\n"
         f"　　{STAR} 身份卡 {STAR}\n"
         f"{CARD_BOTTOM}\n"
-        f"队伍 {emoji} {team}　身份 {identity}\n\n"
+        f"队伍　{STAR}　{emoji} {team}\n"
+        f"身份　{STAR}　{identity}\n\n"
         f"{SECTION_RULE} 任务 {SECTION_RULE}\n"
         f"{IDENTITY_TASKS[identity]}\n\n"
         f"{SECTION_RULE} 计分规则 {SECTION_RULE}\n"
@@ -92,7 +91,8 @@ def mini_identity_card_text(team, identity):
         f"　　{STAR} 身份卡 · Mini 3v3 {STAR}\n"
         f"　　　　（不计分）\n"
         f"{CARD_BOTTOM}\n"
-        f"队伍 {emoji} {team}　身份 {identity}\n\n"
+        f"队伍　{STAR}　{emoji} {team}\n"
+        f"身份　{STAR}　{identity}\n\n"
         f"{SECTION_RULE} 任务 {SECTION_RULE}\n"
         f"{MINI_IDENTITY_TASKS[identity]}\n"
         f"{CARD_BOTTOM}"
