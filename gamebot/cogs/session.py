@@ -66,7 +66,7 @@ class SessionCog(commands.Cog):
             await ctx.send("当前没有进行中的场次。", ephemeral=True)
             return
         self.db.leave_session(session["id"], ctx.author.id)
-        await ctx.send(f"👋 {ctx.author.display_name} 已离开本次活动")
+        await ctx.send(f"🌊 {ctx.author.display_name} 已离开本次活动")
 
     @session.command(name="leaderboard", description="查看本次活动排行榜")
     async def leaderboard(self, ctx: commands.Context):
@@ -155,7 +155,7 @@ class SessionCog(commands.Cog):
             await ctx.send("当前没有进行中的场次。", ephemeral=True)
             return
         self.db.leave_session(session["id"], member.id)
-        await ctx.send(f"👋 已将 {messages.mention(member.id)} 移出本次活动")
+        await ctx.send(f"🌊 已将 {messages.mention(member.id)} 移出本次活动")
 
     @session.command(name="adjustscore", description="[管理] 调整某玩家在本场次的总分")
     @app_commands.describe(member="要调整的玩家", delta="加减分数，可为负数")
