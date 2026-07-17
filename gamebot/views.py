@@ -19,8 +19,8 @@ def winning_roles_line(db, teams, identities, winning_team):
 
 
 class ManualTeamSelectView(discord.ui.View):
-    """Ephemeral dropdown shown to the host running /game startmanual or
-    /mini startmanual. Populated with only the current roster (never the
+    """Ephemeral dropdown shown to the host running /game assign or
+    /mini assign. Populated with only the current roster (never the
     whole server), so there's nothing to search -- and Discord enforces
     min_values == max_values == team_size, so submitting an uneven split
     isn't possible in the first place."""

@@ -27,7 +27,7 @@ class MiniCog(commands.Cog):
     @commands.guild_only()
     async def mini(self, ctx: commands.Context):
         await ctx.send(
-            "请使用 /mini join|leave|status|start|startmanual|result|"
+            "请使用 /mini join|leave|status|start|assign|result|"
             "closevote|resolvetie|cancel|reveal|end",
             ephemeral=True,
         )
@@ -98,7 +98,7 @@ class MiniCog(commands.Cog):
         await ctx.send(f"{messages.JELLY} 已结束当前 Mini 名单。再次 /mini join 会开启新的名单。")
 
     def _check_can_start(self, ctx):
-        """Shared by start/startmanual: active session, previous game
+        """Shared by start/assign: active session, previous game
         (if any) is done, and the roster is exactly MINI_GAME_SIZE.
         Returns (session, players) on success, or sends the error and
         returns None."""
@@ -146,8 +146,8 @@ class MiniCog(commands.Cog):
         teams = game_logic.assign_teams(players, team_size=config.MINI_TEAM_SIZE)
         await self._launch_game(session, teams, lambda content, view: ctx.send(content, view=view))
 
-    @mini.command(name="startmanual", description="手动指定队伍开始新的一局 Mini 3v3")
-    async def startmanual(self, ctx: commands.Context):
+    @mini.command(name="assign", description="手动指定队伍开始新的一局 Mini 3v3")
+    async def assign(self, ctx: commands.Context):
         checked, error = self._check_can_start(ctx)
         if error:
             await ctx.send(error, ephemeral=True)

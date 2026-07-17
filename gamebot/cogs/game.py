@@ -30,7 +30,7 @@ class GameCog(commands.Cog):
     @commands.guild_only()
     async def game(self, ctx: commands.Context):
         await ctx.send(
-            "请使用 /game start|startmanual|status|confirmations|forceconfirm|result|"
+            "请使用 /game start|assign|status|confirmations|forceconfirm|result|"
             "closevote|resolvetie|cancel|reveal",
             ephemeral=True,
         )
@@ -64,7 +64,7 @@ class GameCog(commands.Cog):
         )
 
     def _check_can_start(self, ctx):
-        """Shared by start/startmanual: active session, previous game
+        """Shared by start/assign: active session, previous game
         (if any) is done, and the roster is exactly GAME_SIZE. Returns
         (session, players) on success, or sends the error and returns None."""
         try:
@@ -91,7 +91,7 @@ class GameCog(commands.Cog):
     async def _launch_game(self, session, teams, reply):
         """reply(content, view): however the caller wants to deliver the
         team announcement -- ctx.send for /game start, an interaction
-        followup for /game startmanual's dropdown submission."""
+        followup for /game assign's dropdown submission."""
         identities = game_logic.assign_game_identities(teams)
         game_id, game_number = self.db.create_game(session["id"])
         self.db.save_team_assignment(game_id, teams, identities)
@@ -116,8 +116,8 @@ class GameCog(commands.Cog):
         teams = game_logic.assign_teams(players)
         await self._launch_game(session, teams, lambda content, view: ctx.send(content, view=view))
 
-    @game.command(name="startmanual", description="手动指定队伍开始新的一局游戏")
-    async def startmanual(self, ctx: commands.Context):
+    @game.command(name="assign", description="手动指定队伍开始新的一局游戏")
+    async def assign(self, ctx: commands.Context):
         checked, error = self._check_can_start(ctx)
         if error:
             await ctx.send(error, ephemeral=True)
