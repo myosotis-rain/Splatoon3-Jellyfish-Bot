@@ -418,8 +418,11 @@ class GameCog(commands.Cog):
             await ctx.send("本局投票尚未结束，无法公开身份。", ephemeral=True)
             return
         teams, identities = self.db.get_teams_and_identities(game["id"])
+        names = {p: self.db.name_or_id(p) for players in teams.values() for p in players}
         await ctx.send(
-            messages.reveal_text(teams, identities, game["losing_team"], game["winning_team"])
+            messages.reveal_text(
+                teams, identities, game["losing_team"], game["winning_team"], names
+            )
         )
         category = game_logic.outcome_category(
             teams, identities, game["losing_team"], game["eliminated_player"]

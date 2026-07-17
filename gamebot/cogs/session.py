@@ -185,7 +185,7 @@ class SessionCog(commands.Cog):
             await ctx.send("当前没有进行中的场次。", ephemeral=True)
             return
         self.db.leave_session(session["id"], member.id)
-        await ctx.send(f"🌊 已将 {messages.mention(member.id)} 移出本次活动")
+        await ctx.send(f"🌊 已将 {member.display_name} 移出本次活动")
 
     @session.command(name="adjustscore", description="[管理] 调整某玩家在本场次的总分")
     @app_commands.describe(member="要调整的玩家", delta="加减分数，可为负数")
@@ -201,7 +201,7 @@ class SessionCog(commands.Cog):
         self.db.adjust_score(session["id"], member.id, delta)
         updated = self.db.get_session_player_row(session["id"], member.id)
         await ctx.send(
-            f"{messages.JELLY} 已调整 {messages.mention(member.id)} 的积分 ({delta:+d})\n"
+            f"{messages.JELLY} 已调整 {member.display_name} 的积分 ({delta:+d})\n"
             f"当前总分: {updated['total_score']}"
         )
 

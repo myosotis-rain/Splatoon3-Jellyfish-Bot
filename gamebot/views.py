@@ -32,6 +32,7 @@ class ManualTeamSelectView(discord.ui.View):
         super().__init__(timeout=180)
         self.invoker_id = invoker_id
         self.players = players
+        self.names = names
         self.team_size = team_size
         self.on_submit = on_submit
         self.picked_a = []
@@ -76,8 +77,9 @@ class ManualTeamSelectView(discord.ui.View):
             return
         overlap = set(self.picked_a) & set(self.picked_b)
         if overlap:
+            overlap_names = ", ".join(self.names.get(p, p) for p in overlap)
             await interaction.response.send_message(
-                f"⚠️ 不能同时指定到两队: {', '.join(overlap)}，请重新选择。", ephemeral=True
+                f"⚠️ 不能同时指定到两队: {overlap_names}，请重新选择。", ephemeral=True
             )
             return
         teams = game_logic.assign_teams_partial(

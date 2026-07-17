@@ -1,10 +1,6 @@
 from gamebot import config, messages
 
 
-def test_mention_format():
-    assert messages.mention("123") == "<@123>"
-
-
 def test_loss_result_line_shows_both_team_emoji():
     text = messages.loss_result_line("A", "B")
     assert "🔴 A" in text
@@ -103,12 +99,13 @@ def test_confirmation_status_text_ready():
 def test_reveal_text_lists_all_identities():
     teams = {"A": ["p1"], "B": ["p2"]}
     identities = {"p1": config.IDENTITY_UNDERCOVER, "p2": config.IDENTITY_GOOD}
-    text = messages.reveal_text(teams, identities, losing_team="A", winning_team="B")
+    names = {"p1": "Sophia", "p2": "Alex"}
+    text = messages.reveal_text(teams, identities, "A", "B", names)
     assert "身份揭晓" in text
     assert "落败" in text
     assert "胜利" in text
-    assert f"{messages.mention('p1')}: 🫥 {config.IDENTITY_UNDERCOVER}" in text
-    assert f"{messages.mention('p2')}: {config.IDENTITY_GOOD}" in text
+    assert f"Sophia: 🫥 {config.IDENTITY_UNDERCOVER}" in text
+    assert f"Alex: {config.IDENTITY_GOOD}" in text
 
 
 def test_outcome_text_covers_all_categories():

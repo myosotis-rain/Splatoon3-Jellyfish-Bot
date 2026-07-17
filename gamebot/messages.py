@@ -46,10 +46,6 @@ IDENTITY_SCORING = {
 }
 
 
-def mention(player_id):
-    return f"<@{player_id}>"
-
-
 def loss_result_line(losing_team, winning_team):
     losing_emoji = TEAM_EMOJI.get(losing_team, losing_team)
     winning_emoji = TEAM_EMOJI.get(winning_team, winning_team)
@@ -131,7 +127,7 @@ def confirmation_status_text(confirmed, needed):
     return text
 
 
-def reveal_text(teams, identities, losing_team, winning_team):
+def reveal_text(teams, identities, losing_team, winning_team, names):
     lines = [f"🎨 {STAR} 身份揭晓 {STAR}", ""]
     for team, player_ids in teams.items():
         emoji = TEAM_EMOJI.get(team, team)
@@ -141,7 +137,7 @@ def reveal_text(teams, identities, losing_team, winning_team):
             identity = identities[player_id]
             id_emoji = IDENTITY_EMOJI.get(identity)
             label = f"{id_emoji} {identity}" if id_emoji else identity
-            lines.append(f"{mention(player_id)}: {label}")
+            lines.append(f"{names[player_id]}: {label}")
         lines.append("")
     lines.append(CLOSING_FLOURISH)
     return "\n".join(lines).strip()

@@ -77,7 +77,7 @@ class MiniCog(commands.Cog):
             await ctx.send("当前没有进行中的 Mini 名单。", ephemeral=True)
             return
         self.db.leave_mini_session(session["id"], member.id)
-        await ctx.send(f"🌊 已将 {messages.mention(member.id)} 移出 Mini 名单")
+        await ctx.send(f"🌊 已将 {member.display_name} 移出 Mini 名单")
 
     @mini.command(name="status", description="查看 Mini 名单")
     async def status(self, ctx: commands.Context):
@@ -389,8 +389,11 @@ class MiniCog(commands.Cog):
             await ctx.send("本局投票尚未结束，无法公开身份。", ephemeral=True)
             return
         teams, identities = self.db.get_mini_teams_and_identities(game["id"])
+        names = {p: self.db.name_or_id(p) for players in teams.values() for p in players}
         await ctx.send(
-            messages.reveal_text(teams, identities, game["losing_team"], game["winning_team"])
+            messages.reveal_text(
+                teams, identities, game["losing_team"], game["winning_team"], names
+            )
         )
         category = game_logic.outcome_category(
             teams, identities, game["losing_team"], game["eliminated_player"]
