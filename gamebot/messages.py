@@ -173,7 +173,7 @@ def leaderboard_text(board):
             f"场次 {entry['games_played']}｜总分 {entry['total_score']}｜"
             f"均分 {entry['average']:.2f}"
         )
-        lines.append("")
+    lines.append("")
     lines.append(CLOSING_FLOURISH)
     return "\n".join(lines).strip()
 
